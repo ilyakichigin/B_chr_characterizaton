@@ -32,9 +32,11 @@ To run this pipeline apart from fastq files you also should put following files 
 
 For example if you wanted to launch this pipeline using input .txt file same as in example above you would need to have:
 
-1. bosTau7.1.bt2, bosTau7.2.bt2, bosTau7.3.bt2, bosTau7.4.bt2, bosTau7.fa, bosTau7.rev.1.bt2, bosTau7.rev.2.bt2 files and same files for canFam3 and hg19 (named exactly)
+1. 8 fastq files named anyhow but first two (alphabetically first) must contain reads data of CFA12, second two BFA26, third CPYB and fourth NPP6.
 
-2. bosTau7.genome, canFam3.genome
+2. bosTau7.1.bt2, bosTau7.2.bt2, bosTau7.3.bt2, bosTau7.4.bt2, bosTau7.fa, bosTau7.rev.1.bt2, bosTau7.rev.2.bt2 files and same files for canFam3 and hg19 (named exactly)
 
-3. Folder named bed.reg.files containing 3_CPYB.reg.bed, 4_NPP6.reg.bed (note that controls dont need region files)
+3. bosTau7.genome, canFam3.genome
+
+4. Folder named bed.reg.files containing 3_CPYB.reg.bed, 4_NPP6.reg.bed (note that controls dont need region files)
 
