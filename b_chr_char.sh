@@ -47,7 +47,8 @@ do
 	(( i++ ))
 	(( j=j+2 ))
 done
-
+mkdir graphs
+mv *.pdf graphs
 
 cd ../basic_stats
 rm *.control*
