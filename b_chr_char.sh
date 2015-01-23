@@ -33,7 +33,7 @@ cp *.control*.filter.cs.bam control_stats
 cp *.filter.cs.bam basic_stats
 
 cd control_stats
-IFS=$'\r\n' GLOBIGNORE='*' :; bam_array=($(ls | cat))
+IFS=$'\r\n' GLOBIGNORE='*' :; bam_array=($(ls *.bam | cat))
 cp ../../*.genome .
 number_control=${#bam_array[@]}
 
@@ -41,7 +41,9 @@ j=1
 i=0
 while [ $i -lt $number_control ]
 do
-	control_stats.py "${bam_array[i]}" "${name_array[j]}.genome" > "${name_array[j-1]}.stats.txt"
+	../../bin/control_stats.py "${bam_array[i]}" "${name_array[j]}.genome" > "${name_array[j-1]}.stats.txt"
+	IFS=$'\r\n' GLOBIGNORE='*' :; num_chr=($(wc -l "${name_array[j]}.genome"))
+	../../bin/control_graphs.R "${bam_array[i]:0:-4}" "$(( $num_chr-2))"
 	(( i++ ))
 	(( j=j+2 ))
 done
@@ -60,7 +62,7 @@ j=$(( $number_control*2+1))
 i=0
 while [ $i -lt $array_len ]
 do
-	basic_statistic.py "${bam_array[i]}" "${reg_array[i]}" "${name_array[j]}.genome" > "${name_array[j-1]}.stats.txt"
+	../../bin/basic_statistic.py "${bam_array[i]}" "${reg_array[i]}" "${name_array[j]}.genome" > "${name_array[j-1]}.stats.txt"
 	(( i++ ))
 	(( j=j+2 ))
 done
