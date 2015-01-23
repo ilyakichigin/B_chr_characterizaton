@@ -20,7 +20,7 @@ To start pipeline simply run main shell script with .txt file as argument. That 
 
 )
 
-Note that controls should have .control after their name and alphabetical order of names must be same as alphabetical order of fastq files used.
+Note that controls should have .control after their name and should be first also alphabetical order of names must be same as alphabetical order of fastq files used.
 
 To run this pipeline apart from fastq files you also should put following files in folder with this pipeline:
 
