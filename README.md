@@ -8,7 +8,7 @@ To start pipeline simply run main shell script with .txt file as argument. That 
 2_BTA26.control bosTau7
 3_CPYB bosTau7
 4_NPP6 canFam3
-)\r
+)
 Note that controls should have .control after their name and alphabetical order of names must be same as alphabetical order of fastq files used.
 To run this pipeline apart from fastq files you also should put following files in folder with this pipeline:
 1. Bowtie2 indexed refernce genomes (named same as input .txt file) and indexed hg19 genome
