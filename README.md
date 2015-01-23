@@ -1,5 +1,6 @@
 Pipeline containing set of tools designed to process Next Generation Sequence data to get some statistics and graphs. Pipeline has been designed for B chromosome data analysis but may be used for any sequence data. Starting point and input for this pipeline is paired fastq files containing reads.
 To start pipeline simply run main shell script with .txt file as argument. That .txt file should contain name of samples and of reference genomes for those samples and should have following format:
+
 1_name.control name_ref
 2_name2.control name_ref2
 3_name3 name_ref
