@@ -102,7 +102,7 @@ def chromosome(n):
 
 	# This function creates simple list with numbers of all chromosomes, depending on n and adds X to the end
 
-	chr_list = range(1,n)
+	chr_list = range(1,(n+1))
 	chr_list.append('X')
 	return chr_list
 
@@ -146,7 +146,7 @@ def get_stats(r_list, p_list, n):
 	p_s = get_sum(p_list)
 	final_list.append('chr' + str(n) + '\t') # Add new row to table-list which will hold chromosome statistic and will be outputed in the end as table, n shows number of row/chromosome
 	if n == 'X':
-		n = len(genome_list) - 2	# If n = X it is not the number, so need to assign to n X's position which is last before total
+		n = len(genome_list) - 1	# If n = X it is not the number, so need to assign to n X's position which is last before total
 
 	final_list[n] += '%d\t' % (r_number) # Add chromosome statistics to table-list
 	final_list[n] += '%d\t' % (r_s)
@@ -168,7 +168,7 @@ def delta_sd(r_list, p_list, n):
 	s = 0
 	l = 0
 	if n == 'X':
-		n = len(genome_list) - 2
+		n = len(genome_list) - 1
 
 	for element in r_list:
 
@@ -217,7 +217,7 @@ def cov_sd (r_list, p_list, n):
 	#This function calculates coverage and it's standard deviation
 
 	if n == 'X':
-		n = len(genome_list) - 2
+		n = len(genome_list) - 1
 	s = 0
 	for element in p_list[1:]:
 		s += float(element[3])
