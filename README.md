@@ -24,11 +24,11 @@ Note that controls should have .control after their name and should be first als
 
 To run this pipeline apart from fastq files you also should put following files in folder with this pipeline:
 
-1. Bowtie2 indexed refernce genomes (named same as input .txt file) and indexed hg19 genome
+1. Bowtie2 indexed refernce genomes (named same as in input .txt file) and indexed hg19 genome
 
-2. Text .genome files containing information about number and sizes of chromosomes in reference genomes (named same as input .txt file)
+2. Text .genome files containing information about number and sizes of chromosomes in reference genomes (named same as in input .txt file)
  
-3. Folder named bed.reg.files containing .bed files with locations of regions
+3. Folder named bed_reg_files containing .bed files with locations of regions
 
 For example if you wanted to launch this pipeline using input .txt file same as in example above you would need to have:
 
@@ -38,5 +38,5 @@ For example if you wanted to launch this pipeline using input .txt file same as 
 
 3. bosTau7.genome, canFam3.genome
 
-4. Folder named bed.reg.files containing 3_CPYB.reg.bed, 4_NPP6.reg.bed (note that controls dont need region files)
+4. Folder named bed_reg_files containing 3_CPYB.reg.bed, 4_NPP6.reg.bed (note that controls dont need region files)
 
