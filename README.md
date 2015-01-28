@@ -2,21 +2,21 @@ Pipeline containing set of tools designed to process Next Generation Sequence da
 
 To start pipeline simply run main shell script with .txt file as argument. That .txt file should contain name of samples and of reference genomes for those samples and should have following format:
 
-1_name.control name_ref
+01_name.control name_ref
 
-2_name2.control name_ref2
+02_name2.control name_ref2
 
-3_name3 name_ref
+03_name3 name_ref
 
 (e.g.
 
-1_CFA12.control canFam3
+01_CFA12.control canFam3
 
-2_BTA26.control bosTau7
+02_BTA26.control bosTau7
 
-3_CPYB bosTau7
+03_CPYB bosTau7
 
-4_NPP6 canFam3
+04_NPP6 canFam3
 
 )
 
