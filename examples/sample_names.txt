@@ -1,4 +1,4 @@
-1_CFA12.control canFam3
-2_BTA26.control bosTau7
-3_CPYB bosTau7
-4_NPP6 canFam3
+01_CFA12.control canFam3
+02_BTA26.control bosTau7
+03_CPYB bosTau7
+04_NPP6 canFam3
