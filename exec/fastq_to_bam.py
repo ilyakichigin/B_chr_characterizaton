@@ -15,9 +15,9 @@ def parse_command_line_arguments():
                     
                     1) Change read names to include '1' for forward and '2' for reverse read (Illumina-specific).
                     2) Cut Illumina adapters and DOP primers.
-                    3) Perform paired end mapping to reference and human genome (hg19).
+                    3) Perform paired end mapping to reference and contamination genomes.
                     
-                    Prints out programs used to stdout
+                    Prints out programs used to stdout.
                     """
                     )
     parser.add_argument("fastq_F_file", help="fastq file with forward reads (.fastq)")
