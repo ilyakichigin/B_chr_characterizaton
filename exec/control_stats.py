@@ -4,276 +4,153 @@
 import subprocess
 import sys
 import argparse
+import numpy
 
 
 def parse_command_line_arguments():
 
-	parser = argparse.ArgumentParser(description=	
-					"""Creates reads and positions bed files from input reads bam file
-					and genome file after that creates bed files for each
-					individual chromosome and calculates and outputs their statistics
-					in form of a table .
-					"""
-					)
-	parser.add_argument("bam_file", help="bam file with reads (.bam)")
-	parser.add_argument("genome_file", help="genome file which contains size of all chromosomes and total genome size at the end (.genome)")
+    parser = argparse.ArgumentParser(description=    
+                    """
+                    With bam file and chromosome sizes file (.sizes) as inputs create reads and positions bed file and print statistics for each chromosome. 
+                    Requires: bedtools (tested on v.2.17.0), numpy (tested on v.1.8.2) 
+                    """
+                    )
+    parser.add_argument("bam_file", help="input bam file")
+    parser.add_argument("sizes_file", help="tab-separated file with sizes of chromosomes (for example, from UCSC genome database chromInfo.txt) #and total genome size at the end# (.sizes). Note that only chromosomes listed in this file will be processed.")
+    parser.add_argument("--path_to_bedtools", default="bedtools",help="path to bedtools")
 
-	return parser.parse_args()
+    return parser.parse_args()
+    
+def parse_sizes(filename):
+    
+    # Parse chromosome size file. Returns list: [[(chromosome, size)], total genome size].
 
+    master_data = [[],0] 
+    with open(filename, 'rU') as in_file:
+        sys.stderr.write("Processing chromosome sizes file %s\n" % (filename))
 
-def creating_files(arg_list, c):
+        for line in in_file:
+            element_list = line.split('\t')
+            master_data[0].append((element_list[0], element_list[1]))
+            master_data[1] += int(element_list[1]) # exception if not numeric
 
-	# Function which is used to create .bed files through bedtools commands
+    return master_data
 
-	proc_list = ['bedtools'] + arg_list
-	process = subprocess.Popen(proc_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	(output, err) = process.communicate()
-	log = 'a' # log shows if we need to create log file anew or add something to existent one
+def run_bedtools(bam_file, path_to_bedtools):
 
-	if err == "": # If statement that shows if bedtools did all with no errors and stderr output is empty or not 
-		status="completed"
-	else:
-		status="attempted"
+    # Using bedtools generate .bed files with reads and positions. Returns output file names.
+    
+    file_list = []
 
-	if c == 0: # Conditions which control name of created file and log message depending on number of command - c
-		ending = ".reads.bed"
-		err_message = "Bam to bed command %s\n" % (status)
-		log = 'w' # First log file should be created anew
-	elif c == 1:
-		ending = ".pos.bed"
-		err_message = "Position creation %s\n" % (status)
+    read_bed_name = bam_file[:-4]+'.reads.bed'
+    pos_bed_name = bam_file[:-4]+'.pos.bed'   
+    
+    command_list = [ # [command string, output file name]
+            [path_to_bedtools + ' bamtobed -i ' + bam_file, read_bed_name],
+            [path_to_bedtools + ' merge -n -i ' + read_bed_name, pos_bed_name]
+            ]    
 
-	out_file_name = in_file_name[:-4] + ending # This section represent creation of files
-	out_file = open(out_file_name, 'w')
-	out_file.write(output)
-	out_file.close()
-	file_list.append(out_file_name) # List with names of all created files
-
-	err_file_name = in_file_name[:-4] + ".log" # This section represent creation of log file
-	err_file = open(err_file_name, log)
-	err_file.write(err + err_message)
-	err_file.close()
-
-	
-def file_into_list(in_file_name):
-	
-	# Function which transfers all data from file into list
-
-	master_list = [] # This list will contain data from file
-	with open(in_file_name, 'rU') as in_file:
-		sys.stderr.write("Processing %s\n" % (in_file_name))
-
-		for line in in_file:
-			line = line.strip('\n').strip('\r')
-			element_list = line.split('\t')
-			master_list.append(element_list)
-
-		return master_list
-
-
-def separ(master_list, n):
-
-	# That function separates list with positions/reads into many lists containing elements per chromosome
-
-	n = str(n)
-	slave_list = []
-	ending="." + master_list[0] + '.chr' + n + '.bed' # Ending that will be added to end of file, master_list[0] holds either reads or pos
-
-	for element in master_list[1:]:
-
-		if element[0] == 'chr'+n:
-			slave_list.append(element)
-
-	out_file_name = in_file_name[:-4] + ending
-	out_file = open(out_file_name,'w')
-	sys.stderr.write("Creating %s\n" % (out_file_name))
-	output = ''
-
-	for element in slave_list:	# Save chromosome data in file
-		output += '\t'.join(element) + "\n"
-
-	out_file.write(output)
-	out_file.close()
-
-	return slave_list
-
-
-def chromosome(n):
-
-	# This function creates simple list with numbers of all chromosomes, depending on n and adds X to the end
-
-	chr_list = range(1,(n+1))
-	chr_list.append('X')
-	return chr_list
-
-				
-def get_sum(some_list):
-
-	# Small function to calculate sum bp in list which was acquired from .bed file
-
-	s = 0
-	for element in some_list:
-		s += (int(element[2]) - int(element[1]))
-
-	return s
+    for command in command_list:
+        sys.stderr.write(command[0]+'\n')
+        process = subprocess.Popen(command[0].split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (output, err) = process.communicate()
+        
+        sys.stderr.write(err)
+    
+        with open(command[1],'w') as out_file:
+            sys.stderr.write('Writing output to file '+command[1]+'\n')
+            out_file.write(output)
+        file_list.append(command[1]) # List with names of created files
+        
+    return file_list
 
 
 def get_list(in_file_name):
 
-	# Function that creates list out of .bed file
+    # Reads file into list of lists. 
 
-	with open(in_file_name, 'rU') as in_file:
-		sys.stderr.write("Processing %s\n" % (in_file_name))
-		master_list = [] # Input .bed file will be loaded to this list
-		name = in_file_name.split('.')[-2] # This name will be used to mark master_list, it will be like ending before .bed in creating_files function
-		master_list.append(name)
+    with open(in_file_name, 'rU') as in_file:
+        sys.stderr.write("Reading %s to list.\n" % (in_file_name))
+        master_list = [] 
+        for line in in_file:
+            element_list = line.split()
+            master_list.append(element_list)
 
-		for line in in_file: # Cycle to convert all lines of file to master_list, making list of lists
-			line = line.strip('\n').strip('\r')
-			element_list = line.split('\t')
-			master_list.append(element_list)
-
-	return master_list
+    return master_list
 
 
-def get_stats(r_list, p_list, n):
+def get_basic_stats(bed_list, chrom_size):
 
-	# Function that calculates statistics per chromosome
+    # Calculate basic statistics for list from .bed file
+    
+    # Number of reads/positions
+    bed_num = len(bed_list) 
+    # Sum bp of reads/positions
+    bed_sum = sum([(int(x[2]) - int(x[1])) for x in bed_list]) 
+    # Density
+    bed_dens = bed_num/float(chrom_size)
+    stat_list = (bed_num, bed_sum, bed_dens) 
 
-	r_number = len(r_list)	# Number of reads/positions
-	p_number = len(p_list)
-	r_s = get_sum(r_list) # Sum bp of reads/positions
-	p_s = get_sum(p_list)
-	final_list.append('chr' + str(n) + '\t') # Add new row to table-list which will hold chromosome statistic and will be outputed in the end as table, n shows number of row/chromosome
-	if n == 'X':
-		n = len(genome_list) - 1	# If n = X it is not the number, so need to assign to n X's position which is last before total
+    return stat_list
+    
+def calc_delta(bed_list):
 
-	final_list[n] += '%d\t' % (r_number) # Add chromosome statistics to table-list
-	final_list[n] += '%d\t' % (r_s)
-	final_list[n] += '%.6f\t' % (r_number/float(genome_list[int(n)-1][1]))
-	final_list[n] += '%d\t' % (p_number)
-	final_list[n] += '%d\t' % (p_s)
-	final_list[n] += '%.6f\t' % (p_number/float(genome_list[int(n)-1][1]))
+    # Calculate mean and sd distance between reads/positions for list from .bed file
 
-	return (r_list, p_list)
+    # generate list of distances between neighbors    
+    delta_list = []
+    l = 0
+    for element in bed_list:
+        r = int(element[1])
+        if l > 0:
+            delta_list.append(r-l)
+        l = int(element[2])
 
+    # calculate mean and standard deviation
+    mean_delta = numpy.mean(delta_list)
+    sd_delta = numpy.mean(delta_list)
 
-	
-def delta_sd(r_list, p_list, n):
-
-	# Here mean difference between reads/positions and it's standard deviation is calculated
-
-	delta_list = []
-	mean_delta = 0
-	s = 0
-	l = 0
-	if n == 'X':
-		n = len(genome_list) - 1
-
-	for element in r_list:
-
-		r = int(element[1])
-		if l > 0:
-			delta_list.append(r-l)
-		l = int(element[2])
-
-	for delta in delta_list:
-		mean_delta += delta
-	mean_delta = float(mean_delta)/len(delta_list)
-
-	for delta in delta_list:
-		s += (float(delta) - mean_delta) ** 2
-	sd = (s / len(delta_list)) ** 0.5
-
-	final_list[n] += '%.1f\t' % (mean_delta) # Add chromosome statistics to table-list
-	final_list[n] += '%.1f\t' % (sd)
-
-	delta_list = []
-	mean_delta = 0
-	s = 0
-	l = 0
-
-	for element in p_list:
-
-		r = int(element[1])
-		if l > 0:
-			delta_list.append(r-l)
-		l = int(element[2])
-
-	for delta in delta_list:
-		mean_delta += delta
-	mean_delta = float(mean_delta)/len(delta_list)
-
-	for delta in delta_list:
-		s += (float(delta) - mean_delta) ** 2
-	sd = (s / len(delta_list)) ** 0.5
-
-	final_list[n] += '%.1f\t' % (mean_delta) # Add chromosome statistics to table-list
-	final_list[n] += '%.1f\t' % (sd)
+    return (mean_delta, sd_delta)
 
 
-def cov_sd (r_list, p_list, n):
+def calc_cov(bed_list):
 
-	#This function calculates coverage and it's standard deviation
+    # Calculate mean and sd coverage of positions for list from .bed file
 
-	if n == 'X':
-		n = len(genome_list) - 1
-	s = 0
-	for element in p_list[1:]:
-		s += float(element[3])
-	cov = s/(len(p_list)-1)
-
-	s = 0
-	for element in p_list[1:]:
-		s += (float(element[3]) - cov) ** 2		
-	sd = (s / (len(p_list)-1)) ** 0.5
-
-	final_list[n] += '%.3f\t' % (cov) # Add chromosome statistics to table-list
-	final_list[n] += '%.3f\t' % (sd)
-
+    cov_list = [int(element[3]) for element in bed_list]
+    mean_cov = numpy.mean(cov_list)
+    sd_cov = numpy.mean(cov_list)   
+    
+    return (mean_cov, sd_cov)
 
 if __name__ == '__main__':
-	args = parse_command_line_arguments()
+    args = parse_command_line_arguments()
 
-	in_file_name = args.bam_file
-	genome_file = args.genome_file
+    assert args.bam_file.endswith('.bam')
+    assert args.sizes_file.endswith('.sizes')
+    
+    # Generate bed files
+    wg_bed_files = run_bedtools(args.bam_file, args.path_to_bedtools)
+    size_data = parse_sizes(args.sizes_file)
+    read_list = get_list(wg_bed_files[0])
+    pos_list = get_list(wg_bed_files[1])
 
-	assert in_file_name.endswith('.bam')
-	assert genome_file.endswith('.genome')
-
-	file_list = [] # List which will contain all created files names
-	i = 0 # This variable will show number of command (0 - first, 1 - second)
-
-	''' Table-list which will hold statistics of each individual chromosome on each row,
-	first row containing names of values is created at start'''
-	final_list = ['\tN reads\tRead bp\tRead dens\tN pos\tPos bp\tPos dens\tRead mean delta\tStandard dev\tPos mean delta\tStandard dev\tCoverage\tStandard dev\t']
-
-	genome_list = file_into_list(genome_file) # Transfer all data from .genome file into list
-	n_chr = len(genome_list)-2 # Number of chromosome not counting X and total
-
-	command_list = 	[
-			['bamtobed', '-i', in_file_name],
-			['merge', '-n', '-i', in_file_name[:-4]+".reads.bed"]
-			]
-
-	while i < 2: # Through this cycle 2 .bed files will be created - reads and positions
-		creating_files(command_list[i], i)
-		i += 1
-
-	reads_list = get_list(file_list[0])
-	pos_list = get_list(file_list[1])
-
-	list_with_chr = chromosome(n_chr)
-	
-	for n in list_with_chr: # In this cycle lists will be parsed through series of functions to get all needed stats
-
-		(_in_r_list, _in_p_list) = get_stats(separ(reads_list, n), separ(pos_list, n), n)
-		delta_sd(_in_r_list, _in_p_list, n)
-
-		cov_sd(get_list(in_file_name[:-4] + '.reads.chr' + str(n) + '.bed'), get_list(in_file_name[:-4] + '.pos.chr' + str(n) + '.bed'), n)
-
-	table = '\n'.join(final_list)
-	print table
-
-
-	sys.stderr.write("Completed\n")
+    # Calculate and print stats
+    header = ['chrom','reads','reads.bp','reads.dens','pos','pos.bp','pos.dens','read.pd.mean','read.pd.sd',
+'pos.pd.mean','pos.pd.sd','pos.cov.mean','pos.cov.sd']
+    print '\t'.join(header)
+    for (chrom, chrom_size) in size_data[0]:
+        # subset reads and positions from chromosome
+        chrom_r_list = [read for read in read_list if read[0] == chrom]
+        chrom_p_list = [pos for pos in pos_list if pos[0] == chrom]
+        # calculate stats
+        chrom_stats = [chrom]
+        chrom_stats.extend( get_basic_stats(chrom_r_list, chrom_size) ) # read basic stats
+        chrom_stats.extend( get_basic_stats(chrom_p_list, chrom_size) ) # position basic stats
+        chrom_stats.extend( calc_delta(chrom_r_list) ) # read pairwise distance (pd) stats - pretty useless
+        chrom_stats.extend( calc_delta(chrom_p_list) ) # position distance stats
+        chrom_stats.extend( calc_cov(chrom_p_list) ) # position coverage stats
+        chrom_stats = [str(x) for x in chrom_stats]
+        print '\t'.join(chrom_stats)
+        
+    sys.stderr.write("Complete!\n")
