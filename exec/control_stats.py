@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
 
-import subprocess
-import sys
 import argparse
+import sys
 import numpy
 
 
@@ -11,14 +10,13 @@ def parse_command_line_arguments():
 
     parser = argparse.ArgumentParser(description=    
                     """
-                    With bam file and chromosome sizes file (.sizes) as inputs create reads and positions bed file and print statistics for each chromosome. 
-                    Requires: bedtools (tested on v.2.17.0), numpy (tested on v.1.8.2) 
+                    From reads and positions bed files calculate statistics for each chromosome. 
+                    Requires: numpy (tested on v.1.8.2) 
                     """
                     )
-    parser.add_argument("bam_file", help="input bam file")
+    parser.add_argument("bed_basename", help="read bed name excluding 'reads.bed' or position bed name excluding 'pos.bed'")
     parser.add_argument("sizes_file", help="tab-separated file with sizes of chromosomes (for example, from UCSC genome database chromInfo.txt) #and total genome size at the end# (.sizes). Note that only chromosomes listed in this file will be processed.")
-    parser.add_argument("--path_to_bedtools", default="bedtools",help="path to bedtools")
-
+    
     return parser.parse_args()
     
 def parse_sizes(filename):
@@ -35,35 +33,6 @@ def parse_sizes(filename):
             master_data.append((element_list[0], element_list[1]))
             
     return master_data
-
-def run_bedtools(bam_file, path_to_bedtools):
-
-    # Using bedtools generate .bed files with reads and positions. Returns output file names.
-    
-    file_list = []
-
-    read_bed_name = bam_file[:-4]+'.reads.bed'
-    pos_bed_name = bam_file[:-4]+'.pos.bed'   
-    
-    command_list = [ # [command string, output file name]
-            [path_to_bedtools + ' bamtobed -i ' + bam_file, read_bed_name],
-            [path_to_bedtools + ' merge -n -i ' + read_bed_name, pos_bed_name]
-            ]    
-
-    for command in command_list:
-        sys.stderr.write(command[0]+'\n')
-        process = subprocess.Popen(command[0].split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (output, err) = process.communicate()
-        
-        sys.stderr.write(err)
-    
-        with open(command[1],'w') as out_file:
-            sys.stderr.write('Writing output to file '+command[1]+'\n')
-            out_file.write(output)
-        file_list.append(command[1]) # List with names of created files
-        
-    return file_list
-
 
 def get_list(in_file_name):
 
@@ -124,18 +93,21 @@ def calc_cov(bed_list):
     return (mean_cov, sd_cov)
 
 if __name__ == '__main__':
-    args = parse_command_line_arguments()
 
-    assert args.bam_file.endswith('.bam')
+    args = parse_command_line_arguments()
+    if args.bed_basename.endswith('.'):
+        read_bed_file = args.bed_basename + 'reads.bed'
+        pos_bed_file = args.bed_basename + 'pos.bed'
+    else:
+        read_bed_file = args.bed_basename + '.reads.bed'
+        pos_bed_file = args.bed_basename + '.pos.bed'
     assert args.sizes_file.endswith('.sizes')
     
-    # Generate bed files
-    wg_bed_files = run_bedtools(args.bam_file, args.path_to_bedtools)                
-    read_list = get_list(wg_bed_files[0])
-    pos_list = get_list(wg_bed_files[1])
+    # Parse bed files
+    read_list = get_list(read_bed_file)
+    pos_list = get_list(pos_bed_file)
     # Parse size file
     size_data = parse_sizes(args.sizes_file)    
-    
     # Calculate and print stats
     header = ['chrom','reads','reads.bp','reads.dens','pos','pos.bp','pos.dens','read.pd.mean','read.pd.sd',
 'pos.pd.mean','pos.pd.sd','pos.cov.mean','pos.cov.sd']
