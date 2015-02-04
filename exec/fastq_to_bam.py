@@ -90,4 +90,4 @@ if __name__ == '__main__':
         '''        
         process.wait()
     
-    sys.stderr.write("Complete!\n")
+    sys.stdout.write("Complete!\n")
