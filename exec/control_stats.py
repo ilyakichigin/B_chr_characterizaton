@@ -23,17 +23,17 @@ def parse_command_line_arguments():
     
 def parse_sizes(filename):
     
-    # Parse chromosome size file. Returns list: [[(chromosome, size)], total genome size].
+    # Parse chromosome size file. Returns list: [(chromosome, size)]. 
+    # remove genome size
 
-    master_data = [[],0] 
+    master_data = [] 
     with open(filename, 'rU') as in_file:
         sys.stderr.write("Processing chromosome sizes file %s\n" % (filename))
 
         for line in in_file:
             element_list = line.split('\t')
-            master_data[0].append((element_list[0], element_list[1]))
-            master_data[1] += int(element_list[1]) # exception if not numeric
-
+            master_data.append((element_list[0], element_list[1]))
+            
     return master_data
 
 def run_bedtools(bam_file, path_to_bedtools):
@@ -89,9 +89,9 @@ def get_basic_stats(bed_list, chrom_size):
     bed_sum = sum([(int(x[2]) - int(x[1])) for x in bed_list]) 
     # Density
     bed_dens = bed_num/float(chrom_size)
-    stat_list = (bed_num, bed_sum, bed_dens) 
+    
+    return (bed_num, bed_sum, bed_dens) 
 
-    return stat_list
     
 def calc_delta(bed_list):
 
@@ -108,7 +108,7 @@ def calc_delta(bed_list):
 
     # calculate mean and standard deviation
     mean_delta = numpy.mean(delta_list)
-    sd_delta = numpy.mean(delta_list)
+    sd_delta = numpy.std(delta_list)
 
     return (mean_delta, sd_delta)
 
@@ -119,7 +119,7 @@ def calc_cov(bed_list):
 
     cov_list = [int(element[3]) for element in bed_list]
     mean_cov = numpy.mean(cov_list)
-    sd_cov = numpy.mean(cov_list)   
+    sd_cov = numpy.std(cov_list)   
     
     return (mean_cov, sd_cov)
 
@@ -130,16 +130,17 @@ if __name__ == '__main__':
     assert args.sizes_file.endswith('.sizes')
     
     # Generate bed files
-    wg_bed_files = run_bedtools(args.bam_file, args.path_to_bedtools)
-    size_data = parse_sizes(args.sizes_file)
+    wg_bed_files = run_bedtools(args.bam_file, args.path_to_bedtools)                
     read_list = get_list(wg_bed_files[0])
     pos_list = get_list(wg_bed_files[1])
-
+    # Parse size file
+    size_data = parse_sizes(args.sizes_file)    
+    
     # Calculate and print stats
     header = ['chrom','reads','reads.bp','reads.dens','pos','pos.bp','pos.dens','read.pd.mean','read.pd.sd',
 'pos.pd.mean','pos.pd.sd','pos.cov.mean','pos.cov.sd']
     print '\t'.join(header)
-    for (chrom, chrom_size) in size_data[0]:
+    for (chrom, chrom_size) in size_data:
         # subset reads and positions from chromosome
         chrom_r_list = [read for read in read_list if read[0] == chrom]
         chrom_p_list = [pos for pos in pos_list if pos[0] == chrom]
