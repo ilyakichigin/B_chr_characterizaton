@@ -5,13 +5,10 @@ import sys
 import os.path
 import argparse
 
-#input
-#file1 - bam/sam vs target genome sorted by read name
-#file2 - bam/sam vs contamination genome sorted by read name
 
 def parse_command_line_arguments():
 
-    parser = argparse.ArgumentParser(prog="compEDps",description=    
+    parser = argparse.ArgumentParser(description=    
                     """
                     Removes contamination reads by comparing MAPQs to target and cotamination genomes.
                     Input: sam/bam alignments to target and contamination genomes.
@@ -19,39 +16,40 @@ def parse_command_line_arguments():
                     Pysam python package is required (tested on v.0.8.1)
                     1) (optional) sort input alignments by read name without cleanup.
                     2) Perform contamination analysis.
-                    3) (optional) sort and index resulting alignments with cleanup.
+                    3) sort and index resulting alignments with cleanup.
                     """
                     )
     parser.add_argument("target_file",
                         help="sam/bam alignment to target genome")
     parser.add_argument("contam_file",
                         help="sam/bam alignment to contamination genome. Default - 20.")
-    parser.add_argument("-m", '--min-quality', default=20,
-                        help="Minimum quality to output in filtered filtered")
-    parser.add_argument("-a", "--pre-sort-by-name", action="store_true",
+    parser.add_argument("-m", '--min_quality', default=20,
+                        help="Minimum quality for filtered file")
+    parser.add_argument("-a", "--pre_sort_by_name", action="store_true",
                         help="perform preliminary bam sorting by read name. Do not clean up.")
-    parser.add_argument("-p", "--post-sort-index", action="store_true",
-                        help="perform post sorting by coordinate and indexing of resulting bams. Do clean up.")
+    #parser.add_argument("-p", "--post_sort_index", action="store_true",
+    #                    help="perform post sorting by coordinate and indexing of resulting bams. Do clean up.")
 
     return parser.parse_args()
 
    
 def sort_by_read_name(filename):
+    sys.stderr.write('Sorting input alignment by read name: %s\n'%(filename))
     srt_name = filename[:-4] + '.ns.bam' # ns for name sorted   
-    assert os.path.exists(srt_name) == False
-    sys.stdout.write('Sorting input alignment by read name: %s\n'%(filename))
+    assert os.path.exists(srt_name) == False # input bam not name sorted yet
     pysam.sort('-n', filename, srt_name[:-4])
-    sys.stdout.write('Output file: %s\n'%(srt_name))
+    sys.stderr.write('Output file: %s\n'%(srt_name))
     return srt_name
 
 def sort_index(filename):
-    srt_name = filename[:-4] + '.cs.bam' # cs for coordinate sorted   
-    assert os.path.exists(srt_name) == False
-    sys.stdout.write('Sorting and indexing output alignment: %s\n'%(filename))
+    sys.stderr.write('Sorting and indexing output alignment: %s\n'%(filename))
+    srt_name = filename[:-11] + '.bam' # remove 'unsort.bam'  
+    assert os.path.exists(srt_name) == False # output bam not sorted yet
     pysam.sort(filename, srt_name[:-4])
     pysam.index(srt_name)
-    os.remove(filename)
-    sys.stdout.write('Output file: %s\n'%(srt_name))   
+    sys.stderr.write('Output file: %s\n'%(srt_name))           
+    os.remove(filename) # remove unsorted file
+    sys.stderr.write('rm %s\n'%(filename))
     return srt_name
 
 
@@ -61,15 +59,15 @@ def compare_mapq(tname, cname, min_qual = 20):
         tst = -7
     else:
         tst = -4
-    filter_filename = tname[:tst]+'.filter.bam'   
-    contam_filename = cname[:tst]+'.contam.bam'   
-    unmap_filename = tname[:tst]+'.unmap.bam'   
+    filter_filename = tname[:tst]+'.filter.unsort.bam'   
+    contam_filename = cname[:tst]+'.contam.unsort.bam'   
+    unmap_filename = tname[:tst]+'.unmap.unsort.bam'   
    
     with pysam.AlignmentFile(tname) as tfile, pysam.AlignmentFile(cname) as cfile:
+        sys.stderr.write('Comparing MAPQs. Target: %s, Contam: %s\n'%(tname,cname))        
         filter_file = pysam.AlignmentFile(filter_filename,'wb', template=tfile)
         contam_file = pysam.AlignmentFile(contam_filename,'wb', template=cfile)
         unmap_file = pysam.AlignmentFile(unmap_filename,'wb', template=tfile)   
-        sys.stdout.write('Comparing MAPQs. Target: %s, Contam: %s\n'%(tname,cname))        
         for tread in tfile:
             cread = cfile.next() # gets same line from contamination file
             assert tread.query_name == cread.query_name
@@ -84,12 +82,17 @@ def compare_mapq(tname, cname, min_qual = 20):
         contam_file.close()
         unmap_file.close()
 
-    sys.stdout.write('Output files: %s, %s, %s\n'%(filter_filename, contam_filename, unmap_filename))
+    sys.stderr.write('Output files: %s, %s, %s\n'%(filter_filename, contam_filename, unmap_filename))
+    # remove input files
+    os.remove(tname)
+    os.remove(cname)
+    sys.stderr.write('rm %s %s\n'%(tname, cname))
 
     return (filter_filename, contam_filename, unmap_filename)   
 
 if __name__ == '__main__':
     args = parse_command_line_arguments()
+    args.min_quality = int(args.min_quality)
 
     if args.pre_sort_by_name:
         args.contam_file = sort_by_read_name(args.contam_file)
@@ -97,6 +100,5 @@ if __name__ == '__main__':
 
     outnames = compare_mapq(args.target_file, args.contam_file, args.min_quality)
    
-    if args.post_sort_index:
-        for filename in outnames:
-           sort_index(filename)
+    for filename in outnames:
+        sort_index(filename)

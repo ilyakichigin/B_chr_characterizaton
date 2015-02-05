@@ -65,8 +65,10 @@ if __name__ == '__main__':
     # assign output filenames
     f_ca_fq_name = args.sample_name + '.F.ca.fastq'
     r_ca_fq_name = args.sample_name + '.R.ca.fastq'
-    target_sam_name = args.sample_name + '.' + args.target_genome.split('/')[-1] + '.sam' # simplified name: sample.genome.sam. 'ca' and 'pe not included (compared to previous versions)
-    contam_sam_name = args.sample_name + '.' + args.contam_genome.split('/')[-1] + '.sam'
+    target_name = args.target_genome.split('/')[-1]
+    contam_name = args.contam_genome.split('/')[-1]
+    target_sam_name = args.sample_name + '.' + target_name + '.sam' # simplified name: sample.genome.sam. 'ca' and 'pe not included (compared to previous versions)
+    contam_sam_name = args.sample_name + '.' + contam_name + '.sam'
     
     # generate commands
     # * supress bowtie2 warnings - too many for short reads

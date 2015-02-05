@@ -34,13 +34,15 @@ def run_bedtools(bam_file, path_to_bedtools):
     for command in command_list:
         sys.stderr.write(command[0]+'\n')
         process = subprocess.Popen(command[0].split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (output, err) = process.communicate()
-        
-        sys.stderr.write(err)
-    
+        (out, err) = process.communicate()
+        process.wait()
+        if err:
+            sys.stderr.write(err)
+            sys.exit()
         with open(command[1],'w') as out_file:
             sys.stderr.write('Writing output to file '+command[1]+'\n')
-            out_file.write(output)
+            out_file.write(out)
+        
         
 if __name__ == '__main__':
     args = parse_command_line_arguments()

@@ -39,7 +39,7 @@ def get_list(in_file_name):
     # Reads file into list of lists. 
 
     with open(in_file_name, 'rU') as in_file:
-        sys.stderr.write("Reading %s to list.\n" % (in_file_name))
+        #sys.stderr.write("Reading %s to list.\n" % (in_file_name))
         master_list = [] 
         for line in in_file:
             element_list = line.split()

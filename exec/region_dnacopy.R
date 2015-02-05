@@ -1,5 +1,7 @@
 #!/usr/bin/Rscript
 
+# From positions bed file generate bed-like file with regions and their statistics and pdf plot for all chromosomes listed in .sizes file. 
+# Steps:
 # Calculate pairwise distances between positions
 # Call regions based on distances to the position on the left
 # Plot chromosomes to '.reg.pdf' file
@@ -10,16 +12,12 @@
 # Argument1 - '.pos.bed' file with postions
 # Argument2 - '.sizes' file with sizes of chromosomes for which regions are called
 
-library(DNAcopy)
-library(plyr)
-# Packages installation:
+# Package installation:
 #source("http://bioconductor.org/biocLite.R")
 #biocLite("DNAcopy")
-#install.packages('plyr')
+library(DNAcopy)
 
 # Parameter section
-#wd <- '~/workdir/B_mamm/run2/20150202_kig_script/' #rm
-#setwd(wd) #rm
 args <- commandArgs(trailingOnly = TRUE)
 pos_file <- args[1] # file with positions
 size_file <- args[2] # file with chromosome sizes
@@ -126,8 +124,6 @@ outdata1$reads.mean <- round(add_stats[4,], digits=2)
 outdata1$reads.sd <- round(add_stats[5,], digits=2)
 outdata1$chrom_size <- add_stats[6,]
 outdata1$dist_by_size <- round(outdata1$l_dist.mean/outdata1$chrom_size, digits=6) # mean l_dist divided by chromosome size
-# Sort by increasing mean dist using plyr
-outdata1 <- arrange(outdata1, dist_by_size)
 # Write tsv file
 write.table(outdata1,file=paste(id,'.reg.tsv',sep=''),quote=F,sep='\t',
             row.names=F,col.names=T)
