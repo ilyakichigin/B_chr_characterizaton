@@ -22,9 +22,9 @@ def parse_command_line_arguments():
 
     parser.add_argument("sample_name", help="output name of sample (can be anything, in our case CFA12, VVUB and so on)")
 
-    parser.add_argument("-t", "--target_genome", help="base name of reference genome (e.g. canFam3, bosTau7)")
+    parser.add_argument("-t", "--target_genome", help="base name of reference genome bowtie2 index (e.g. canFam3, bosTau7)")
 
-    parser.add_argument("-c", "--contam_genome", default="hg19", help="base name for contamination genome (default hg19)")
+    parser.add_argument("-c", "--contam_genome", default="hg19", help="base name for contamination genome bowtie2 index (default hg19)")
 
     parser.add_argument("--path_to_cutadapt", default="cutadapt", help="path to cutadapt binary")
 
@@ -41,7 +41,7 @@ def rename_reads(in_file_name):
     with open(in_file_name, 'rU') as in_file:
         in_file_base = in_file_name.split('/')[-1] # output to current folder
         out_file_name = '.'.join(in_file_base.split('.')[:-1]+['rn','fastq'])
-        sys.stdout.write("Renaming reads in %s. Writing to %s.\n" % (in_file_name,out_file_name))
+        sys.stderr.write("Renaming reads in %s. Writing to %s.\n" % (in_file_name,out_file_name))
         with open(out_file_name, 'w') as out_file:
             for line in in_file:
                 line_list = line.split(' ')
@@ -73,21 +73,21 @@ if __name__ == '__main__':
     command_list = [
             (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -n 3 -o ' + f_ca_fq_name + ' ' + forward_rn_fq),
             (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -n 3 -o ' + r_ca_fq_name + ' ' + reverse_rn_fq),
+            ('rm ' + forward_rn_fq + ' ' + reverse_rn_fq),
             (args.path_to_bowtie2 + ' -p ' + args.proc_bowtie2 + ' --local -x ' + args.target_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + target_sam_name),
             (args.path_to_bowtie2 + ' -p ' + args.proc_bowtie2 + ' --local -x ' + args.contam_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + contam_sam_name)
             ]
     
     # run
     for command in command_list:
-        sys.stdout.write(command+'\n') 
-        process = subprocess.Popen(command.split()) 
-        '''        
+        sys.stderr.write(command+'\n') 
+        process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
+        (out, err) = process.communicate()
+        sys.stdout.write(out)
         # ignore bowtie2 warnings of too short reads. All sterr is stored in memory!         
-        err = process.communicate()[1]
-        for line in err:
+        for line in err.splitlines(True):
             if ('Warning: skipping mate' not in line) and ('Warning: minimum score function' not in line):
                 sys.stderr.write(line)
-        '''        
         process.wait()
     
-    sys.stdout.write("Complete!\n")
+    sys.stderr.write("Complete!\n")
