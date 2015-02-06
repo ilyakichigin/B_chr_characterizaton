@@ -76,9 +76,28 @@ outdata$loc.end <- apply(outdata[,c('chrom','loc.end')], 1, function(y) {
   flt_pos_df[flt_pos_df$V1==y['chrom'] & flt_pos_df$V2 == as.numeric(y['loc.end']),]$V3
 })
 
+# Remove col1 (ID), initialize new output variable 
+outdata1 <- outdata[,-c(1)]
+
+# Calculate mean and sd of dist
+add_stats1 <- apply(outdata1[,c('chrom','loc.start','loc.end')], 1, function(y) {
+  # Subset of positions for each region
+  flt_pos_sub <- subset(flt_pos_df, V1==y['chrom']
+                    & V2>=as.numeric(y['loc.start']) 
+                    & V3<=as.numeric(y['loc.end']) )
+  # chrom size from .sizes file 
+  chr_size <- as.numeric(subset(size_df,V1==y['chrom']))[2] 
+  return(c(mean(flt_pos_sub$V5),sd(flt_pos_sub$V5),chr_size))
+})
+# Add stats to output
+outdata1$l_dist.mean <- round(add_stats1[1,], digits=0)
+outdata1$l_dist.sd <- round(add_stats1[2,], digits=0)
+outdata1$chrom_size <- add_stats1[3,]
+outdata1$dist_by_size <- round(outdata1$l_dist.mean/outdata1$chrom_size, digits=6) # mean l_dist divided by chromosome size
+
 # Correct for l distance: shift one position to the left, if seg.mean.left>seg.mean.right
 corr_start_end <- c()
-for (i in 1:nrow(outdata)){
+for (i in 1:nrow(outdata1)){
   #start of first position in segment
   start_index <- which(flt_pos_df$V1 == as.character(outdata[i,'chrom']) 
                        & flt_pos_df$V2 == as.numeric(outdata[i,'loc.start']))
@@ -91,39 +110,32 @@ for (i in 1:nrow(outdata)){
                               flt_pos_df[start_index-1,'V2'], # only case to correct
                               flt_pos_df[start_index,'V2']))
   corr_end <- ifelse(end_index == nrow(flt_pos_df) || outdata[i,'chrom']!=outdata[i+1,'chrom'], # end of chr
-                      flt_pos_df[end_index,'V3'],
-                      ifelse(outdata[i,'seg.mean']>outdata[i+1,'seg.mean'], # from lower to higher density?
-                             flt_pos_df[end_index-1,'V3'], # only case to correct
-                             flt_pos_df[end_index,'V3']))
-                       
+                     flt_pos_df[end_index,'V3'],
+                     ifelse(outdata[i,'seg.mean']>outdata[i+1,'seg.mean'], # from lower to higher density?
+                            flt_pos_df[end_index-1,'V3'], # only case to correct
+                            flt_pos_df[end_index,'V3']))
+  
   corr_start_end <- c(corr_start_end, corr_start, corr_end)               
 }
 corr_se_matrix <- matrix(corr_start_end,ncol=2, byrow=T)
-outdata$loc.start <- corr_se_matrix[,1]
-outdata$loc.end <- corr_se_matrix[,2]
+outdata1$loc.start <- corr_se_matrix[,1]
+outdata1$loc.end <- corr_se_matrix[,2]
 
-# Remove col1 (ID), initialize new output variable 
-outdata1 <- outdata[,-c(1)]
-
-# Calculate mean and sd of reads and dist
-add_stats <- apply(outdata1[,c('chrom','loc.start','loc.end')], 1, function(y) {
+# Calculate number of markers, read coverage mean and sd
+add_stats2 <- apply(outdata1[,c('chrom','loc.start','loc.end')], 1, function(y) {
   # Subset of positions for each region
   flt_pos_sub <- subset(flt_pos_df, V1==y['chrom']
-                    & V2>=as.numeric(y['loc.start']) 
-                    & V3<=as.numeric(y['loc.end']) )
+                        & V2>=as.numeric(y['loc.start']) 
+                        & V3<=as.numeric(y['loc.end']) )
   # chrom size from .sizes file 
   chr_size <- as.numeric(subset(size_df,V1==y['chrom']))[2] 
-  return(c(nrow(flt_pos_sub),mean(flt_pos_sub$V5),sd(flt_pos_sub$V5),
-           mean(flt_pos_sub$V4),sd(flt_pos_sub$V4),chr_size))
+  return(c(nrow(flt_pos_sub),mean(flt_pos_sub$V4),sd(flt_pos_sub$V4)))
 })
-# Add stats to output
-outdata1$num.mark <- add_stats[1,]
-outdata1$l_dist.mean <- round(add_stats[2,], digits=0)
-outdata1$l_dist.sd <- round(add_stats[3,], digits=0)
-outdata1$reads.mean <- round(add_stats[4,], digits=2)
-outdata1$reads.sd <- round(add_stats[5,], digits=2)
-outdata1$chrom_size <- add_stats[6,]
-outdata1$dist_by_size <- round(outdata1$l_dist.mean/outdata1$chrom_size, digits=6) # mean l_dist divided by chromosome size
+# add to output
+outdata1$num.mark <- add_stats2[1,]
+outdata1$reads.mean <- round(add_stats2[2,], digits=2)
+outdata1$reads.sd <- round(add_stats2[3,], digits=2)
+
 # Write tsv file
 write.table(outdata1,file=paste(id,'.reg.tsv',sep=''),quote=F,sep='\t',
             row.names=F,col.names=T)
