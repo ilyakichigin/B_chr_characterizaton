@@ -89,12 +89,13 @@ for (i in 1:nrow(outdata1)){
   #end of last position in segment
   end_index <- which(flt_pos_df$V1 == as.character(outdata[i,'chrom']) 
                      & flt_pos_df$V3 == as.numeric(outdata[i,'loc.end']))
-  corr_start <- ifelse(start_index == 1 || outdata[i-1,'chrom']!=outdata[i,'chrom'], # start of chr
+  #correction
+  corr_start <- ifelse(i == 1 || outdata[i-1,'chrom']!=outdata[i,'chrom'], # start of chr
                        flt_pos_df[start_index,'V2'],
                        ifelse(outdata[i-1,'seg.mean']>outdata[i,'seg.mean'], # from lower to higher density?
                               flt_pos_df[start_index-1,'V2'], # only case to correct
                               flt_pos_df[start_index,'V2']))
-  corr_end <- ifelse(end_index == nrow(flt_pos_df) || outdata[i,'chrom']!=outdata[i+1,'chrom'], # end of chr
+  corr_end <- ifelse(i == nrow(outdata1) || outdata[i,'chrom']!=outdata[i+1,'chrom'], # end of chr
                      flt_pos_df[end_index,'V3'],
                      ifelse(outdata[i,'seg.mean']>outdata[i+1,'seg.mean'], # from lower to higher density?
                             flt_pos_df[end_index-1,'V3'], # only case to correct
