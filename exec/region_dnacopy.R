@@ -24,6 +24,7 @@ size_file <- args[2] # file with chromosome sizes
 plot.type <- 's' # 'w' for whole genome in one picture
 left_dist <- TRUE # Calculate distance to left position. Correction for right dist not implemented.
 draw_plot <- TRUE # FALSE to skip plotting
+log_dist <- FALSE # calculate regions based on log(pairvise distances)
 
 # Inputs
 pos_df <- read.table(pos_file)
@@ -66,8 +67,23 @@ if (draw_plot) {
 }
 
 # File output version - normal scale y
-CNA.object <- CNA(flt_pos_df$V5,flt_pos_df$V1,flt_pos_df$V2,
-                  data.type = 'logratio',sampleid = id)
+CNA.object <-ifelse(log_dist,
+   <- CNA(log(flt_pos_df$V5),flt_pos_df$V1,flt_pos_df$V2,
+                    data.type = 'logratio',sampleid = id), 
+ 
+)
+if (log_dist) {
+  CNA.object <- CNA(
+    log(flt_pos_df$V5),
+    flt_pos_df$V1,flt_pos_df$V2,
+    data.type = 'logratio',sampleid = id)
+}else{
+  CNA.object <- CNA(
+    flt_pos_df$V5,
+    flt_pos_df$V1,flt_pos_df$V2,
+    data.type = 'logratio',sampleid = id)  
+}
+
 smoothed.CNA.object <- smooth.CNA(CNA.object)
 segment.smoothed.CNA.object <- segment(smoothed.CNA.object, verbose=1)
 outdata <- segment.smoothed.CNA.object$output
