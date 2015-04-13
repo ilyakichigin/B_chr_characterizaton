@@ -71,7 +71,7 @@ def compare_mapq(tname, cname, min_qual = 20):
         for tread in tfile:
             cread = cfile.next() # gets same line from contamination file
             assert tread.query_name == cread.query_name
-            if (tread.mapping_quality < min_qual) and (cread.mapping_quality < min_qual): # unmapped
+            if tread.mapping_quality < min_qual: # unmapped
                 unmap_file.write(tread) # output mapping for target genome
             elif tread.mapping_quality < cread.mapping_quality: # contamination
                 contam_file.write(cread) # output mapping for contamination genome
