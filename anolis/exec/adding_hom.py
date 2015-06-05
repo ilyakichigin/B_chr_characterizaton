@@ -13,7 +13,7 @@ def parse_command_line_arguments():
 					"""
 					)
 	parser.add_argument("tsv_file", help="tsv file")
-	parser.add_argument("homology_score_file", help="txt file (obtained by get-hom script) containing scaffolds and their homologies")
+	parser.add_argument("homology_score_file", help="txt file (obtained by get_hom script) containing scaffolds and their homologies")
 
 	return parser.parse_args()
 
