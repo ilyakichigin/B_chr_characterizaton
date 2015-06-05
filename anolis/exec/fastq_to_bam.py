@@ -32,7 +32,7 @@ def parse_command_line_arguments():
 
     parser.add_argument("-p", "--proc_bowtie2", default="1", help="number of processors allocated for bowtie2. Default - 1.")
 
-    parser.add_argument("--wga", help="change trimered primers from DOP to WGA", action="store_true")
+    parser.add_argument("--wga", default="false", help="change trimered primers from DOP to WGA, print true if need to use WGA")
 
     return parser.parse_args()
    
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     # * supress bowtie2 warnings - too many for short reads
     primer = 'CCACATNNNNNNCTCGAGTCGG'
     rev_primer = 'CCGACTCGAGNNNNNNATGTGG'
-    if args.wga:
+    if args.wga == 'true':
         primer = 'TTGTGTTGGGTGTGTTTGG'
         rev_primer = 'CCAAACACACCCAACACAA'
     command_list = [
