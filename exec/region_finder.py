@@ -3,7 +3,6 @@
 
 import sys
 import argparse
-from numpy import median
 from numpy import std
 
 
@@ -11,22 +10,16 @@ def parse_command_line_arguments():
 
 	parser = argparse.ArgumentParser(description=	
 					"""Outputs region out of position bed file
-					usage - get_region.py pos_bed_file.bed genome_file.genome > reg.bed
+					usage - get_region.py pos_bed_file.bed genome_file.size > reg.bed
 					"""
 					)
 	parser.add_argument("pos_bed_file", help="bed file with all positions (.bed)")
-	parser.add_argument("genome_file", 
-			    help="genome file which contains size of all chromosomes and total genome size at the end (.genome)")
+	parser.add_argument("sizes_file", 
+			    help="file which contains size of all chromosomes (.size)")
 	parser.add_argument("-d", "--distance", type=int, default=58000,
 		            help="restriction on pairwise distance which will show if position in region or not")
 	parser.add_argument("-tr", "--total_reads", type=int, default=70,
 		            help="minimum number of reads in whole region needed to consider it a true region")
-	parser.add_argument("-ar", "--average_reads", type=int, default=0,
-		            help="minimum average of reads in whole region needed to consider it a true region")
-	parser.add_argument("-m", "--median", type=int, default=0,
-		            help="minimum number of median of reads in whole region needed to consider it a true region")
-	parser.add_argument("-a", "--average", help="take into account average values (to deal with contamination)",
-                    action="store_true")
 
 	return parser.parse_args()
 
@@ -106,25 +99,10 @@ def average(some_list, n):
 if __name__ == '__main__':
 	args = parse_command_line_arguments()
 
-	max_dist = args.distance
-	min_sum_reads = args.total_reads
-	in_file_name = args.pos_bed_file
-	genome_file = args.genome_file
-	min_mean_reads = args.average_reads
-	min_median = args.median
-	include_mean = args.average
+	genome_list = file_into_list(args.sizes_file) # Transfer all data from .sizes file into list
+	n_chr = len(args.sizes_file)-1 # Number of chromosome not counting X
 
-	assert in_file_name.endswith('.pos.bed')
-	assert genome_file.endswith('.genome')
-	#print "Max PD = \t" + str(max_dist)
-	#print "Min sum reads = \t" + str(min_sum_reads)
-	#print "Min reads median =\t" + str(min_median)
-
-	genome_list = file_into_list(genome_file) # Transfer all data from .genome file into list
-	n_chr = len(genome_list)-2 # Number of chromosome not counting X and total
-
-
-	pos_list = file_into_list(in_file_name)
+	pos_list = file_into_list(args.pos_bed_file)
 
 	list_with_chr = chromosome(n_chr)
 
@@ -141,14 +119,6 @@ if __name__ == '__main__':
 		b1 = 0 # Border 1 or start of region
 		b2 = 0 # Broder 2 or end of region
 		sum_n = 0 # Sum number of reads in a region
-
-		if include_mean: # Use mean values as filter to contamination
-			mean_sum_reads = average(pos_chr_list, 3)
-			mean_distance = average(delta_list, -1)
-			min_sum_reads += 2*mean_sum_reads
-			max_dist = max_dist - 0.02*(1/mean_distance)
-
-
 
 		while i < (len(delta_list)-3):
 
@@ -169,12 +139,12 @@ if __name__ == '__main__':
 			end = pos_chr_list[i+2][2] # End of region relatively to position we are in
 
 	 
-			if k < max_dist and \
-			   r < max_dist and \
-			   r2 < max_dist and \
-			   l < max_dist and \
-			   l2 > max_dist and \
-			   (k+r+r2+l) < (max_dist-0.1*max_dist) and \
+			if k < args.distance and \
+			   r < args.distance and \
+			   r2 < args.distance and \
+			   l < args.distance and \
+			   l2 > args.distance and \
+			   (k+r+r2+l) < (args.distance-0.1*args.distance) and \
 			   b1 == 0 and \
 			   b2 == 0:
 
@@ -194,12 +164,12 @@ if __name__ == '__main__':
 				pairwise_dist_list.append(k)
 				
 
-			elif k < max_dist and \
-			     r < max_dist and \
-			     r2 < max_dist and \
-			     l < max_dist and \
-			     l2 < max_dist and \
-			     (k+r+r2+l+l2) < (max_dist+0.2*max_dist) and \
+			elif k < args.distance and \
+			     r < args.distance and \
+			     r2 < args.distance and \
+			     l < args.distance and \
+			     l2 < args.distance and \
+			     (k+r+r2+l+l2) < (args.distance+0.2*args.distance) and \
 			     b1 != 0 and \
 			     b2 == 0:
 
@@ -210,12 +180,12 @@ if __name__ == '__main__':
 				pairwise_dist_list.append(k)
 				sum_pos += 1
 
-			elif k < max_dist and \
-			     r < max_dist and \
-			     r2 > max_dist and \
-			     l < max_dist and \
-			     l2 < max_dist and \
-			     (k+r+l+l2) < (max_dist-0.1*max_dist) and \
+			elif k < args.distance and \
+			     r < args.distance and \
+			     r2 > args.distance and \
+			     l < args.distance and \
+			     l2 < args.distance and \
+			     (k+r+l+l2) < (args.distance-0.1*args.distance) and \
 			     b1 != 0 and \
 			     b2 == 0:
 				sum_n += int(pos_chr_list[i-1][3]) + int(pos_chr_list[i][3]) + int(pos_chr_list[i+1][3])
@@ -224,7 +194,7 @@ if __name__ == '__main__':
 				reads_list.append(int(pos_chr_list[i+1][3]))
 				pairwise_dist_list.append(k)
 				pairwise_dist_list.append(r)
-				if sum_n > min_sum_reads and median(reads_list) > min_median and sum(reads_list)/float(len(reads_list)) > min_mean_reads:
+				if sum_n > args.total_reads:
 
 					"""End of region -  all distances should be small except far right one (r2), region must have start (b1 != 0),
 					sum number of reads in a region must not be small and sum distances in region can not be big
@@ -239,8 +209,5 @@ if __name__ == '__main__':
 				b1 = 0 # Region ended so we need to nulify all variables
 				b2 = 0
 
-
-
-
-
+	sys.stderr.write("Complete!\n")
 
