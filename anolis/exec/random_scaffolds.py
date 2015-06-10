@@ -42,7 +42,7 @@ def create_scaffolds(input_list):
 			end = str(80741955)
 		element_list = []
 		element_list.append('chr6')
-  	element_list.append(start)
+  		element_list.append(start)
 		element_list.append(end)
 		element_list.append('control_%d' % (n))
 		master_list.append(element_list)
