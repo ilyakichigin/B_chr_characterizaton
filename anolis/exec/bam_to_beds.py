@@ -52,4 +52,3 @@ if __name__ == '__main__':
     wg_bed_files = run_bedtools(args.bam_file, args.path_to_bedtools)
 
     sys.stderr.write("Complete!\n")
-
