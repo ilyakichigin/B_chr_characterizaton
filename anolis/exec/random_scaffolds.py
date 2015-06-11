@@ -31,14 +31,14 @@ def file_into_list(file_name):
 
 def create_scaffolds(input_list):
 
-	i = 0
-	n = 0
+	i = 0 # Variable start of scaffolds
+	n = 0 # Number of scaffold
 	master_list = []
 	while i < 80741955: # 80741955 is a size of ACA6
-		j = int(random.choice(input_list))
-		start = str(i + 1)
+		j = int(random.choice(input_list)) # Variable random end of scaffolds
+		start = str(i + 1) # When new scaffold is created 1 nucleotide step right is requied
   		end = str(j + i)
-		if i+j > 80741955:
+		if i+j > 80741955: # if end of scaffold exceeds size of chromosome it will be changed to match its end
 			end = str(80741955)
 		element_list = []
 		element_list.append('chr6')
@@ -58,3 +58,5 @@ if __name__ == '__main__':
 
 	for item in output_list:
 		print '\t'.join(item)
+
+	sys.stderr.write("Complete!\n")
