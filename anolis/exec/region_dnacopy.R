@@ -4,7 +4,7 @@
 # Steps:
 # Calculate pairwise distances between positions
 # Call regions based on distances to the position on the left
-# Plot chromosomes to '.reg.pdf' file
+# Plot chromosomes to '.reg.pdf' file (ignored in this particular analysis)
 # Correct regions - shift one position to the left if seg.mean.left>seg.mean.right
 # Calculate statistics of distances and coverage for each region
 # Write resulting table to '.reg.tsv' file
@@ -141,10 +141,6 @@ outdata1$in.dist.sd <- round(add_stats[3,], digits=0)
 outdata1$reads.mean <- round(add_stats[4,], digits=2)
 outdata1$reads.sd <- round(add_stats[5,], digits=2)
 outdata1$chrom.size <- add_stats[6,]
-outdata1$mean.test <- add_stats[7,]
-outdata1$sd.test <- add_stats[8,]
-outdata1$test <- add_stats[9,]
-outdata1$dist.by.size <- round(outdata1$in.dist.mean/outdata1$chrom.size, digits=6) # mean l_dist divided by chromosome size
 
 # Write tsv file
 write.table(outdata1,file=paste(id,'.reg.tsv',sep=''),quote=F,sep='\t',
