@@ -24,11 +24,13 @@ def run_bedtools(bam_file, path_to_bedtools):
     # Using bedtools generate .bed files with reads and positions. Returns output file names.
     
     read_bed_name = bam_file[:-4]+'.reads.bed'
+    srt_read_bed_name = bam_file[:-4]+'.srt.reads.bed'
     pos_bed_name = bam_file[:-4]+'.pos.bed'   
     
     command_list = [ # [command string, output file name]
             [path_to_bedtools + ' bamtobed -i ' + bam_file, read_bed_name],
-            [path_to_bedtools + ' merge -n -i ' + read_bed_name, pos_bed_name]
+            [path_to_bedtools + ' sort -i ' + read_bed_name, srt_read_bed_name],
+            [path_to_bedtools + ' merge -n -i ' + srt_read_bed_name, pos_bed_name]
             ]    
 
     for command in command_list:
@@ -48,3 +50,6 @@ if __name__ == '__main__':
     args = parse_command_line_arguments()
     assert args.bam_file.endswith('bam')
     wg_bed_files = run_bedtools(args.bam_file, args.path_to_bedtools)
+
+    sys.stderr.write("Complete!\n")
+
