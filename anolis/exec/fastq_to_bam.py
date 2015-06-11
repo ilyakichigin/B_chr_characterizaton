@@ -76,7 +76,7 @@ if __name__ == '__main__':
     # * supress bowtie2 warnings - too many for short reads
     primer = 'CCACATNNNNNNCTCGAGTCGG'
     rev_primer = 'CCGACTCGAGNNNNNNATGTGG'
-    if args.wga == 'true':
+    if args.wga != 'false':
         primer = 'TTGTGTTGGGTGTGTTTGG'
         rev_primer = 'CCAAACACACCCAACACAA'
     command_list = [
