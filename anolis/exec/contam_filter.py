@@ -27,8 +27,6 @@ def parse_command_line_arguments():
                         help="Minimum quality for filtered file")
     parser.add_argument("-a", "--pre_sort_by_name", action="store_true",
                         help="perform preliminary bam sorting by read name. Do not clean up.")
-    #parser.add_argument("-p", "--post_sort_index", action="store_true",
-    #                    help="perform post sorting by coordinate and indexing of resulting bams. Do clean up.")
 
     return parser.parse_args()
 
@@ -71,7 +69,7 @@ def compare_mapq(tname, cname, min_qual = 20):
         for tread in tfile:
             cread = cfile.next() # gets same line from contamination file
             assert tread.query_name == cread.query_name
-            if (tread.mapping_quality < min_qual) and (cread.mapping_quality < min_qual): # unmapped
+            if tread.mapping_quality < min_qual: # unmapped
                 unmap_file.write(tread) # output mapping for target genome
             elif tread.mapping_quality < cread.mapping_quality: # contamination
                 contam_file.write(cread) # output mapping for contamination genome
@@ -102,3 +100,5 @@ if __name__ == '__main__':
    
     for filename in outnames:
         sort_index(filename)
+
+    sys.stderr.write("Complete!\n")
