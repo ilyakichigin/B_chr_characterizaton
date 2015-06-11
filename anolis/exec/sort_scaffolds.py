@@ -38,3 +38,5 @@ if __name__ == '__main__':
 	for item in output_list:
 		item[1] = str(item[1])
 		print '\t'.join(item)
+
+	sys.stderr.write("Complete!\n")
