@@ -51,11 +51,9 @@ def rename_reads(in_file_name):
                     out_line = line
                 out_file.write(out_line)
 
-    return out_file_name    
+    return out_file_name
 
-if __name__ == '__main__':
-    args = parse_command_line_arguments()
-
+def main(args):    
     assert args.fastq_F_file.endswith('.fastq') and args.fastq_R_file.endswith('.fastq') # does not accept gzipped and improperly named files
 
     # rename reads
@@ -91,5 +89,8 @@ if __name__ == '__main__':
             if ('Warning: skipping mate' not in line) and ('Warning: minimum score function' not in line):
                 sys.stderr.write(line)
         process.wait()
+
+if __name__ == '__main__':
+    main(parse_command_line_arguments())
+
     
-    sys.stderr.write("Complete!\n")

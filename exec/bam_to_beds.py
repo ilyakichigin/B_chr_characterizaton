@@ -4,6 +4,7 @@
 import subprocess
 import sys
 import argparse
+import os
 
 
 def parse_command_line_arguments():
@@ -34,7 +35,7 @@ def run_bedtools(bam_file, path_to_bedtools):
             ]    
 
     for command in command_list:
-        sys.stderr.write(command[0]+'\n')
+        sys.stderr.write('%s > %s\n' % (command[0],command[1]))
         process = subprocess.Popen(command[0].split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (out, err) = process.communicate()
         process.wait()
@@ -42,14 +43,15 @@ def run_bedtools(bam_file, path_to_bedtools):
             sys.stderr.write(err)
             sys.exit()
         with open(command[1],'w') as out_file:
-            sys.stderr.write('Writing output to file '+command[1]+'\n')
             out_file.write(out)
-        
-        
-if __name__ == '__main__':
-    args = parse_command_line_arguments()
+    sys.stderr.write('mv %s %s\n' % (srt_read_bed_name,read_bed_name))    
+    os.rename(srt_read_bed_name,read_bed_name)
+
+def main(args):
     assert args.bam_file.endswith('bam')
     wg_bed_files = run_bedtools(args.bam_file, args.path_to_bedtools)
-
-    sys.stderr.write("Complete!\n")
+        
+if __name__ == '__main__':
+    main(parse_command_line_arguments())
+    
 

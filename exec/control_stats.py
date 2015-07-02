@@ -92,9 +92,7 @@ def calc_cov(bed_list):
     
     return (mean_cov, sd_cov)
 
-if __name__ == '__main__':
-
-    args = parse_command_line_arguments()
+def main(args):
     if args.bed_basename.endswith('.'):
         read_bed_file = args.bed_basename + 'reads.bed'
         pos_bed_file = args.bed_basename + 'pos.bed'
@@ -125,5 +123,7 @@ if __name__ == '__main__':
         chrom_stats.extend( calc_cov(chrom_p_list) ) # position coverage stats
         chrom_stats = [str(x) for x in chrom_stats]
         print '\t'.join(chrom_stats)
-        
-    sys.stderr.write("Complete!\n")
+    
+if __name__ == '__main__':
+    main(parse_command_line_arguments())
+

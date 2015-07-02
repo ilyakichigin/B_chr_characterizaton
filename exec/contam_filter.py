@@ -90,8 +90,7 @@ def compare_mapq(tname, cname, min_qual = 20):
 
     return (filter_filename, contam_filename, unmap_filename)   
 
-if __name__ == '__main__':
-    args = parse_command_line_arguments()
+def main(args):
     args.min_quality = int(args.min_quality)
 
     if args.pre_sort_by_name:
@@ -102,3 +101,7 @@ if __name__ == '__main__':
    
     for filename in outnames:
         sort_index(filename)
+
+if __name__ == '__main__':
+    main(parse_command_line_arguments())
+    
