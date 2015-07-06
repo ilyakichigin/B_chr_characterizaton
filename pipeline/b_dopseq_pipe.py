@@ -5,7 +5,8 @@ import argparse
 import os.path
 
 import sys
-sys.path.append('../exec')
+exec_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..","exec"))
+sys.path.append(exec_path)
 
 import fastq_to_bam
 import contam_filter
@@ -104,14 +105,14 @@ if __name__ == '__main__':
     # Step 3b. Draw control_plots.R if these do not exist.
     control_plot_file = base_name+'.chrom.pdf'
     if not os.path.isfile(control_plot_file):
-        cp_command = ['../exec/control_plots.R',pos_bed_file,conf['sizes_file']]
+        cp_command = [exec_path+'/control_plots.R',pos_bed_file,conf['sizes_file']]
         sys.stderr.write('----control_plots.R----\n')
         run_script(cp_command)
         sys.stderr.write('----Complete!----\n')
     # Step 4. Perform region_dnacopy.R if regions do not exist.
     regions_file = base_name+'.reg.tsv'
     if not os.path.isfile(regions_file):
-        rd_command = ['../exec/region_dnacopy.R',pos_bed_file,conf['sizes_file']]
+        rd_command = [exec_path+'/region_dnacopy.R',pos_bed_file,conf['sizes_file']]
         sys.stderr.write('----region_dnacopy.R----\n')
         run_script(rd_command)
         sys.stderr.write('----Complete!----\n')

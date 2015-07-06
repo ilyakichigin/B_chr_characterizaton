@@ -53,9 +53,9 @@ def sort_index(filename):
     return srt_name
 
 
-def compare_mapq(tname, cname, min_qual = 20):
+def compare_mapq(tname, cname, min_qual = 20, pre_sort_by_name = True):
     # read files - autodetect format, "rb" not specified
-    if args.pre_sort_by_name:
+    if pre_sort_by_name:
         tst = -7
     else:
         tst = -4
@@ -97,7 +97,7 @@ def main(args):
         args.contam_file = sort_by_read_name(args.contam_file)
         args.target_file = sort_by_read_name(args.target_file)
 
-    outnames = compare_mapq(args.target_file, args.contam_file, args.min_quality)
+    outnames = compare_mapq(args.target_file, args.contam_file, args.min_quality, args.pre_sort_by_name)
    
     for filename in outnames:
         sort_index(filename)
