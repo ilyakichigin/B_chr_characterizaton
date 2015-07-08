@@ -1,20 +1,29 @@
 #!/usr/bin/env python
 
-
 import subprocess
-import sys
 import argparse
+import os.path
 
+import sys
+exec_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..","exec"))
+sys.path.append(exec_path)
+
+import fastq_to_bam
+import contam_filter
+import bam_to_beds
 
 def parse_command_line_arguments():
 
     parser = argparse.ArgumentParser(description=    
                     """
                     Pipeline for processing of sequencing data of DOP-PCR libraries from isolated chromosomes.
+                    Changed for Anolis sequencing work.
                     See config for process description, inputs and outputs. 
                     """
                     )
     parser.add_argument("config_file", help="input configuration file")
+    #parser.add_argument("-d", "--dry-run", action="store_true",
+    #                    help="Check all dependencies and print out all commands")
     
     return parser.parse_args()
 
@@ -37,52 +46,53 @@ def parse_config(config_file):
 
 def run_script(command, run=False):
 
-    # Does not stop on errors from within
+    # Err: Does not stop on errors from within
     sys.stderr.write(' '.join(command)+'\n') 
-    if run:
-        process = subprocess.Popen(command) 
-        process.wait()
-
-def run_script_to_file(command, outfile, run=False):
-    
-    sys.stderr.write(' '.join(command)+'\n') 
-    if run:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (out,err) = process.communicate()
-        sys.stderr.write(err)
-        with open(outfile, 'w') as of:
-            of.write(out) 
-        process.wait()
-  
+    process = subprocess.Popen(command) 
+    process.wait()
     
 if __name__ == '__main__':
     args = parse_command_line_arguments()
     conf = parse_config(args.config_file)
-    sample = conf['sample']
-    assert len(sample) > 0 # sample name not empty
-    path_to_exec = conf['path_to_exec']
+    #dry_run = args.dry_run
+    # !need to add executables check!
     target_name = conf["target_genome"].split('/')[-1]
     contam_name = conf["contam_genome"].split('/')[-1]
-
-    if not path_to_exec.endswith('/'):
-        path_to_exec += '/'
-       
-    if conf['do_fastq_to_bam'] == 'True':
-        command = [path_to_exec + "fastq_to_bam.py","-t",conf["target_genome"],"-c",conf["contam_genome"],
-                    "--path_to_cutadapt",conf["path_to_cutadapt"],"--path_to_bowtie2",conf["path_to_bowtie2"],
-                    "-p",conf["proc_bowtie2"],"--wga",conf["wga"],conf['fastq_F_file'],conf['fastq_R_file'],sample]
-        run_script(command, run=True)
-    if conf['do_contam_filter'] == 'True':
-        target_sam = '.'.join([sample,target_name,'sam'])
-        contam_sam = '.'.join([sample,contam_name,'sam'])
-        command = [path_to_exec + "contam_filter.py","-m",conf["min_quality"],"-a",
-                    target_sam,contam_sam]
-        run_script(command, run=True)
-    if conf['do_bam_to_beds'] == 'True':
-        in_bam = '.'.join([sample,target_name,'filter','bam'])
-        command = [path_to_exec + "bam_to_beds.py","--path_to_bedtools",conf["path_to_bedtools"],in_bam]
-        run_script(command, run=True)
-    if conf['do_region_dnacopy'] == 'True':
-        pos_bed = '.'.join([sample,target_name,'filter','pos','bed'])
-        command = [path_to_exec + "region_dnacopy.R",pos_bed,conf["sizes_file"]]
-        run_script(command, run=True)
+    # Steps 1&2. fastq_to_bam and contam_filter if filetered bam does not exist.    
+    base_name = '.'.join([conf['sample'],target_name,'filter'])
+    filtered_bam_file = base_name+'.bam'
+    if not os.path.isfile(filtered_bam_file):    
+        # Step 1. Perform fastq_to_bam if resulting sam files do not exist.
+        target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
+        contam_sam_file = '.'.join([conf['sample'],contam_name,'sam'])
+        if ((not os.path.isfile(target_sam_file) and not os.path.isfile(contam_sam_file)) 
+            or (os.path.getsize(target_sam_file) == 0)):
+            fb_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
+                                         sample_name=conf['sample'],target_genome=conf["target_genome"],
+                                         contam_genome=conf["contam_genome"],proc_bowtie2=conf["proc_bowtie2"],
+                                         path_to_cutadapt='cutadapt',path_to_bowtie2='bowtie2')
+            assert os.path.isfile(conf['fastq_F_file'])
+            assert os.path.isfile(conf['fastq_R_file'])
+            sys.stderr.write('----fastq_to_bam.py----\n')
+            fastq_to_bam.main(fb_args)
+            sys.stderr.write('----Complete!----\n')
+        cf_args = argparse.Namespace(target_file=target_sam_file,contam_file=contam_sam_file,
+                                     min_quality=20,pre_sort_by_name=True)
+        sys.stderr.write('----contam_filter.py----\n')        
+        contam_filter.main(cf_args)
+        sys.stderr.write('----Complete!----\n')
+    # Step 3. Convert bam_to_beds with reads and positions if these files do not exist.
+    reads_bed_file = base_name+'.reads.bed'
+    pos_bed_file = base_name+'.pos.bed'
+    if (not os.path.isfile(reads_bed_file) and not os.path.isfile(pos_bed_file)):
+        btb_args = argparse.Namespace(bam_file=filtered_bam_file,path_to_bedtools='bedtools')
+        sys.stderr.write('----bam_to_beds.py----\n')
+        bam_to_beds.main(btb_args)
+        sys.stderr.write('----Complete!----\n')
+    # Step 4. Perform region_dnacopy.R if regions do not exist.
+    regions_file = base_name+'.reg.tsv'
+    if not os.path.isfile(regions_file):
+        rd_command = [exec_path+'/region_dnacopy.R',pos_bed_file,conf['sizes_file']]
+        sys.stderr.write('----region_dnacopy.R----\n')
+        run_script(rd_command)
+        sys.stderr.write('----Complete!----\n')
