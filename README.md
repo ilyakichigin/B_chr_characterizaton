@@ -1,6 +1,12 @@
-Pipeline containing a set of tools processing Next Generation Sequence data obtained from Degenerate Oligonucleotide Primed PCR libraries of isolated (flow sorted or microdissected) chromosomes to get some statistics and graphs. Pipeline has been designed for B chromosome data analysis but may be used for any sequence data. Starting point and input for this pipeline is paired end fastq files containing reads.
+# Introduction
 
-To start pipeline go to pipeline folder and use files located there. Additional information is in config file.
+DOPseq_analyzer is a a set of tools for processing of Illumina sequencing data obtained from Degenerate Oligonucleotide Primed PCR libraries of isolated (flow sorted or microdissected) chromosomes. The result is the division of the genome used as reference into regions, which can be further interpreted as target (specific to isolated chromosomes) or contamination (non-specific). Note that these regions cannot be used 'as is' and require manual inspection and correction.
+
+Currently, two pipelines are implemented: 
+1. Analysis of B chromosomes (pipeline/b_dopseq_pipe.py) includes read trimming, alignment to reference genome, contamination filtering, region calling and statistics calculation. It is suitable for reference genomes assembled up to the chromosomes.
+2. Analysis of anole microchromosomes (anolis/pipeline/anolis_dopseq_pipe.py) includes similar steps. It is optimized for reference genomes consisting of scaffolds and has a possibility to handle WGA libraries.
+
+# Installation and usage
 
 Dependancies:
 
@@ -12,7 +18,6 @@ Dependancies:
 
 4. bedtools (tested on v.2.17.0)
 
-5. DNAcopy R package ("http://bioconductor.org/biocLite.R")
+5. DNAcopy R package 
 
-
-Anolis directory holds modified and extended scripts of this pipeline used to analyze anolis sorted micro and sex chromosomes.
+Scripts located into exec folder can be run independenly or as a part of the pipeline. Some of the scripts are not included in the pipelines, as these should use corrected regions as input. For more thorough description, see pipeline config files.
