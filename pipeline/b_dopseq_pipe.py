@@ -110,9 +110,11 @@ if __name__ == '__main__':
         run_script(cp_command)
         sys.stderr.write('----Complete!----\n')
     # Step 4. Perform region_dnacopy.R if regions do not exist.
-    regions_file = base_name+'.reg.tsv'
-    if not os.path.isfile(regions_file):
-        rd_command = [exec_path+'/region_dnacopy.R',pos_bed_file,conf['sizes_file']]
+    regions_table = base_name+'.reg.tsv'
+    regions_plot = base_name+'.reg.pdf'
+    if not os.path.isfile(regions_table) or not os.path.isfile(regions_plot):
+        # pdf height and width increased to get readable plot for all chromosomes 
+        rd_command = [exec_path+'/region_dnacopy.R',pos_bed_file,conf['sizes_file'],'20','20']
         sys.stderr.write('----region_dnacopy.R----\n')
         run_script(rd_command)
         sys.stderr.write('----Complete!----\n')

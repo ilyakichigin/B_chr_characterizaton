@@ -21,13 +21,18 @@ library(DNAcopy)
 args <- commandArgs(trailingOnly = TRUE)
 pos_file <- args[1] # file with positions
 size_file <- args[2] # file with chromosome sizes
+# pdf size
+if (length(args) == 4) {
+    pdf_width <- as.numeric(args[3])
+    pdf_height <- as.numeric(args[4])} else {
+    pdf_width <- 7
+    pdf_height <- 8}
+
 plot.type <- 's' # 'w' for whole genome in one picture
 left_dist <- TRUE # Calculate distance to left position. Correction for right dist not implemented.
 draw_plot <- TRUE # FALSE to skip plotting
 log_dist <- TRUE # calculate regions based on log(pairvise distances)
-# pdf size 
-pdf_width <- 7
-pdf_height <- 8
+
 
 # Inputs
 pos_df <- read.table(pos_file)
