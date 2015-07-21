@@ -53,11 +53,9 @@ def rename_reads(in_file_name):
                     out_line = line
                 out_file.write(out_line)
 
-    return out_file_name    
+    return out_file_name
 
-if __name__ == '__main__':
-    args = parse_command_line_arguments()
-
+def main(args):    
     assert args.fastq_F_file.endswith('.fastq') and args.fastq_R_file.endswith('.fastq') # does not accept gzipped and improperly named files
 
     # rename reads
@@ -72,13 +70,15 @@ if __name__ == '__main__':
     target_sam_name = args.sample_name + '.' + target_name + '.sam' # simplified name: sample.genome.sam. 'ca' and 'pe not included (compared to previous versions)
     contam_sam_name = args.sample_name + '.' + contam_name + '.sam'
     
-    # generate commands
-    # * supress bowtie2 warnings - too many for short reads
+    #change primer in case of wga trimming
     primer = 'CCACATNNNNNNCTCGAGTCGG'
     rev_primer = 'CCGACTCGAGNNNNNNATGTGG'
     if args.wga != 'false':
         primer = 'TTGTGTTGGGTGTGTTTGG'
         rev_primer = 'CCAAACACACCCAACACAA'
+
+    # generate commands
+    # * supress bowtie2 warnings - too many for short reads
     command_list = [
             (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a ' + primer + ' -g ' + rev_primer + ' -n 3 -o ' + f_ca_fq_name + ' ' + forward_rn_fq),
             (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a ' + primer + ' -g ' + rev_primer + ' -n 3 -o ' + r_ca_fq_name + ' ' + reverse_rn_fq),
@@ -98,5 +98,8 @@ if __name__ == '__main__':
             if ('Warning: skipping mate' not in line) and ('Warning: minimum score function' not in line):
                 sys.stderr.write(line)
         process.wait()
+
+if __name__ == '__main__':
+    main(parse_command_line_arguments())
+
     
-    sys.stderr.write("Complete!\n")

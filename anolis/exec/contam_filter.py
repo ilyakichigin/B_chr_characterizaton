@@ -22,11 +22,13 @@ def parse_command_line_arguments():
     parser.add_argument("target_file",
                         help="sam/bam alignment to target genome")
     parser.add_argument("contam_file",
-                        help="sam/bam alignment to contamination genome. Default - 20.")
+                        help="sam/bam alignment to contamination genome")
     parser.add_argument("-m", '--min_quality', default=20,
-                        help="Minimum quality for filtered file")
+                        help="Minimum quality for filtered file. Default - 20.")
     parser.add_argument("-a", "--pre_sort_by_name", action="store_true",
                         help="perform preliminary bam sorting by read name. Do not clean up.")
+    #parser.add_argument("-p", "--post_sort_index", action="store_true",
+    #                    help="perform post sorting by coordinate and indexing of resulting bams. Do clean up.")
 
     return parser.parse_args()
 
@@ -51,9 +53,9 @@ def sort_index(filename):
     return srt_name
 
 
-def compare_mapq(tname, cname, min_qual = 20):
+def compare_mapq(tname, cname, min_qual = 20, pre_sort_by_name = True):
     # read files - autodetect format, "rb" not specified
-    if args.pre_sort_by_name:
+    if pre_sort_by_name:
         tst = -7
     else:
         tst = -4
@@ -88,17 +90,18 @@ def compare_mapq(tname, cname, min_qual = 20):
 
     return (filter_filename, contam_filename, unmap_filename)   
 
-if __name__ == '__main__':
-    args = parse_command_line_arguments()
+def main(args):
     args.min_quality = int(args.min_quality)
 
     if args.pre_sort_by_name:
         args.contam_file = sort_by_read_name(args.contam_file)
         args.target_file = sort_by_read_name(args.target_file)
 
-    outnames = compare_mapq(args.target_file, args.contam_file, args.min_quality)
+    outnames = compare_mapq(args.target_file, args.contam_file, args.min_quality, args.pre_sort_by_name)
    
     for filename in outnames:
         sort_index(filename)
 
-    sys.stderr.write("Complete!\n")
+if __name__ == '__main__':
+    main(parse_command_line_arguments())
+    

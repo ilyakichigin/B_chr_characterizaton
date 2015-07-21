@@ -22,9 +22,9 @@ def parse_command_line_arguments():
     parser.add_argument("target_file",
                         help="sam/bam alignment to target genome")
     parser.add_argument("contam_file",
-                        help="sam/bam alignment to contamination genome. Default - 20.")
+                        help="sam/bam alignment to contamination genome")
     parser.add_argument("-m", '--min_quality', default=20,
-                        help="Minimum quality for filtered file")
+                        help="Minimum quality for filtered file. Default - 20.")
     parser.add_argument("-a", "--pre_sort_by_name", action="store_true",
                         help="perform preliminary bam sorting by read name. Do not clean up.")
     #parser.add_argument("-p", "--post_sort_index", action="store_true",
