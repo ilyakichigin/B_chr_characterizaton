@@ -88,7 +88,6 @@ def main(args):
         for line in err.splitlines(True):
             if ('Warning: skipping mate' not in line) and ('Warning: minimum score function' not in line):
                 sys.stderr.write(line)
-        process.wait()
 
 if __name__ == '__main__':
     main(parse_command_line_arguments())

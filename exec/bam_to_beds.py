@@ -38,7 +38,6 @@ def run_bedtools(bam_file, path_to_bedtools):
         sys.stderr.write('%s > %s\n' % (command[0],command[1]))
         process = subprocess.Popen(command[0].split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (out, err) = process.communicate()
-        process.wait()
         if err:
             sys.stderr.write(err)
             sys.exit()
