@@ -26,15 +26,17 @@ def fastq_to_re_fasta(args):
     o_fasta = args.cutadapt_prefix + '.re.fasta'
     rename = args.rename
     
+    min_read_length = 18 # minimum read length defined as word length in megablast at cluster annotation
     i=0 # read number
     k=0 # line number
     fname = ''
     rname = ''
+    print 'Output file: ' + o_fasta
     with open(f_fastq, 'rU') as f_file, open(r_fastq, 'rU') as r_file, open(o_fasta, 'w') as out:
         for fline in f_file:
             rline = r_file.next()
             if fname != '' and rname != '': # read sequence - next line after name
-                if len(fline) > 1 and len(rline) > 1: # exclude pairs with emtpy reads
+                if len(fline) > min_read_length + 1 and len(rline) > min_read_length + 1: # exclude pairs with short reads
                     out.write(fname+fline+rname+rline)
                 fname = ''
                 rname = ''
