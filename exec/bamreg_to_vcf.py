@@ -106,6 +106,14 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
 
     print '-----select-region-variants'
     assert bam_file.endswith('.bam')
+    with open(bed_file) as infile: # bed sanity check
+        for line in infile:
+            if len(line) > 1: # non-empty lines
+                assert line.startswith('chr') # proper chromosome naming in bed file
+                ll = line.split('\t')
+                assert len(ll) == 3 # tab separation and proper column number in bed file
+                assert int(ll[1]) < int(ll[2]) # start coordinate is smaller than end                
+
     vcf_file = bam_file[:-4]+'.hc.vcf'
     reg_vcf_file = bam_file[:-4]+'.reg.hc.vcf'
     if not os.path.isfile(reg_vcf_file):
@@ -123,8 +131,7 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
             sys.exit()
     else:
         print reg_vcf_file + ' region vcf file exists. OK!'
-    print '-----'
-
+    
     # calculate statistics of the resuling file 
 
     reg_vcf_stat_file = bam_file[:-4]+'.reg.hc.txt'
@@ -152,17 +159,16 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
         print reg_vcf_stat_file + ' region variant stat file exists. OK!'
     print '-----'
 
-def annotate_region_variants(bam_file, reg_file, path_to_snpeff, genome_snpEff):
-    
-    # annotate variants for positions residing inside target regions
+def annotate_region_variants(bam_file, path_to_snpEff, genome_snpEff):
     
     print '-----annotate-region-variants'
     
-    vcf_file = bam_file[:-3]+'hc.vcf'
+    # annotate variants for positions residing inside target regions
+    
+    vcf_file = bam_file[:-3]+'reg.hc.vcf'
     ann_vcf_file = bam_file[:-3]+'ann.vcf'
     if not os.path.isfile(ann_vcf_file):
-        se_command = ['java','-Xmx1g','-jar',path_to_snpeff,
-                          '-fi',reg_file,
+        se_command = ['java','-Xmx1g','-jar',path_to_snpEff,
                           '-stats',ann_vcf_file+'.csv', '-csvStats',
                           genome_snpEff, vcf_file]
         with open(ann_vcf_file,'w') as out_vcf:   
@@ -175,13 +181,20 @@ def annotate_region_variants(bam_file, reg_file, path_to_snpeff, genome_snpEff):
     else:
         print ann_vcf_file + ' annotated vcf file exists. OK!'
 
+    
+    print '-----'
+    
+def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
+
+    print '-----calc-annot-stats'
+
     # create bed with positions inside target regions divided into 1bp chunks
 
     pos_file = bam_file[:-3] + 'pos.bed'
     regpos_file = bam_file[:-3] + 'regpos.bed'
     if not os.path.isfile(regpos_file):
         bi_command = ['bedtools','intersect', '-a', pos_file, '-b', reg_file]
-        print ' '.join(bi_command) + ' > ' + regpos_file + ' # Splitting into 1bp'
+        print ' '.join(bi_command) + ' > ' + regpos_file + ' # Splitting into 1bp chunks'
         process = subprocess.Popen(bi_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (out, err) = process.communicate()
         if process.returncode != 0:
@@ -203,7 +216,7 @@ def annotate_region_variants(bam_file, reg_file, path_to_snpeff, genome_snpEff):
 
     count_file = bam_file[:-3] + 'regpos.count'
     if not os.path.isfile(count_file + '.txt'):
-        count_command = ['java','-Xmx1g','-jar',path_to_snpeff,'count',
+        count_command = ['java','-Xmx1g','-jar',path_to_snpEff,'count',
                           '-n',count_file, genome_snpEff, regpos_file]
         print ' '.join(count_command)
         process = subprocess.Popen(count_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -212,8 +225,8 @@ def annotate_region_variants(bam_file, reg_file, path_to_snpeff, genome_snpEff):
             sys.stderr.write(err)
             sys.exit()
     else:
-        print count_file + ' gene count files for positions inside target regions exists. OK!'
-
+        print count_file + ' feature count files for positions inside target regions exists. OK!'
+    
     # create variant density file
     
     dens_file = bam_file[:-3] + 'ann.vcf.dens.txt'
@@ -222,7 +235,7 @@ def annotate_region_variants(bam_file, reg_file, path_to_snpeff, genome_snpEff):
         # parse variant count csv
         
         var_count = dict()
-        with open(ann_vcf_file+'.csv') as infile:
+        with open(bam_file[:-3]+'ann.vcf.csv') as infile:
             i = 0
             for line in infile:
                 if i == 1:
@@ -253,22 +266,22 @@ def annotate_region_variants(bam_file, reg_file, path_to_snpeff, genome_snpEff):
         # calculate density
         
         with open(dens_file, 'w') as out:
+            print dens_file + ' variant density file writing.'
             features = bp_count.keys()
             features.sort()
             for f in features:
                 if f in var_count.keys():
                     out.write( '%s\t%d\n' % (f,bp_count[f]/var_count[f]) ) # int rounding ok?
                 else: # no variants in feature
-                    out.write( '%s\tN\n' % (f) )
+                    out.write( '%s\tNA\n' % (f) )
              
         # clean up
         #print 'rm ' + regpos_file
         #os.remove(regpos_file)
     else:
         print dens_file + ' file with variant densities exists. OK!'
+
     print '-----'
-    
-    
 
 def main(config_file):
     
@@ -279,11 +292,13 @@ def main(config_file):
     run_haplotypecaller(parser.get('VC','bam_file'), parser.get('VC','path_to_gatk'),
                         parser.get('VC','genome_fa'), parser.get('VC','gatk_mem'))
     if parser.get('VA','path_to_snpEff'):
-        annotate_region_variants(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
-                                 parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
-    else:
         select_region_variants(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
                                parser.get('VC','path_to_gatk'), parser.get('VC','genome_fa'), stats=True) 
-  
+        annotate_region_variants(parser.get('VC','bam_file'),
+                                 parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
+        calc_annot_stats(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
+                         parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
+    else:
+        pass
 if __name__ == '__main__':
     main(sys.argv[1])
