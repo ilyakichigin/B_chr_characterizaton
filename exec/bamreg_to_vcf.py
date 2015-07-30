@@ -109,10 +109,10 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
     with open(bed_file) as infile: # bed sanity check
         for line in infile:
             if len(line) > 1: # non-empty lines
-                assert line.startswith('chr') # proper chromosome naming in bed file
+                assert line.startswith('chr'), "Improper chromosome name in bed file:\n%s" % line
                 ll = line.split('\t')
-                assert len(ll) == 3 # tab separation and proper column number in bed file
-                assert int(ll[1]) < int(ll[2]) # start coordinate is smaller than end                
+                assert len(ll) == 3, "Incorrect separation or column number in bed file:\n%s" % line
+                assert int(ll[1]) < int(ll[2]), "Start coordinate is larger than the end in bed file:\n%s" % line                 
 
     vcf_file = bam_file[:-4]+'.hc.vcf'
     reg_vcf_file = bam_file[:-4]+'.reg.hc.vcf'
@@ -291,14 +291,14 @@ def main(config_file):
     prepare_bam(parser.get('VC','bam_file'), parser.get('VC','path_to_picard'))
     run_haplotypecaller(parser.get('VC','bam_file'), parser.get('VC','path_to_gatk'),
                         parser.get('VC','genome_fa'), parser.get('VC','gatk_mem'))
+    select_region_variants(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
+                           parser.get('VC','path_to_gatk'), parser.get('VC','genome_fa'), stats=True) 
+        
     if parser.get('VA','path_to_snpEff'):
-        select_region_variants(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
-                               parser.get('VC','path_to_gatk'), parser.get('VC','genome_fa'), stats=True) 
         annotate_region_variants(parser.get('VC','bam_file'),
                                  parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
         calc_annot_stats(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
                          parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
-    else:
-        pass
+
 if __name__ == '__main__':
     main(sys.argv[1])
