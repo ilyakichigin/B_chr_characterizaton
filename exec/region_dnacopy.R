@@ -11,6 +11,8 @@
 
 # Argument1 - '.pos.bed' file with postions
 # Argument2 - '.sizes' file with sizes of chromosomes for which regions are called
+# Argument3 - plot width (optional)
+# Argument4 - plot height (optional)
 
 # Package installation:
 #source("http://bioconductor.org/biocLite.R")
@@ -21,16 +23,15 @@ library(DNAcopy)
 args <- commandArgs(trailingOnly = TRUE)
 pos_file <- args[1] # file with positions
 size_file <- args[2] # file with chromosome sizes
-# pdf size
-if (length(args) == 4) {
+if (length(args) == 4) { # pdf size
     pdf_width <- as.numeric(args[3])
     pdf_height <- as.numeric(args[4])} else {
-    pdf_width <- 7
-    pdf_height <- 8}
-
+    pdf_width <- 20
+    pdf_height <- 20}
 plot.type <- 's' # 'w' for whole genome in one picture
 left_dist <- TRUE # Calculate distance to left position. Correction for right dist not implemented.
 draw_plot <- TRUE # FALSE to skip plotting
+max_chr_plot <- 42 # maximum number of chromosomes to do plotting - 7*6 plot 20*20 inch
 log_dist <- TRUE # calculate regions based on log(pairvise distances)
 
 
@@ -63,6 +64,10 @@ flt_pos_df$V1 <- factor(flt_pos_df$V1) # remove unused factors
 
 # Region calling
 # Plotting version - log scale y
+if (nrow(size_df) > max_chr_plot) {
+  draw_plot <- FALSE
+  cat('Number of chromosomes in plot exceeds ', max_chr_plot, '. Plotting will be disabled.', sep = "")
+}
 if (draw_plot) {
   CNA.object <- CNA(log(flt_pos_df$V5),flt_pos_df$V1,flt_pos_df$V2,
                     data.type = 'logratio',sampleid = id)
@@ -74,7 +79,7 @@ if (draw_plot) {
   dev.off()
 }
 
-# File output version - normal scale y
+# Table output version - normal scale y
 if (log_dist) {
   CNA.object <- CNA(
     log(flt_pos_df$V5),
