@@ -21,7 +21,7 @@ library(DNAcopy)
 
 # Parameter section
 args <- commandArgs(trailingOnly = TRUE)
-pos_file <- args[1] # file with positions
+pos_file <- args[1] # bed file with positions, additional column with coverage
 size_file <- args[2] # file with chromosome sizes
 if (length(args) == 4) { # pdf size
     pdf_width <- as.numeric(args[3])
@@ -95,9 +95,13 @@ smoothed.CNA.object <- smooth.CNA(CNA.object)
 segment.smoothed.CNA.object <- segment(smoothed.CNA.object, verbose=1)
 outdata <- segment.smoothed.CNA.object$output
 
-# loc.end - change from beginnings to ends of positions  
-outdata$loc.end <- apply(outdata[,c('chrom','loc.end')], 1, function(y) {
-  flt_pos_df[flt_pos_df$V1==y['chrom'] & flt_pos_df$V2 == as.numeric(y['loc.end']),]$V3
+# rename loc to reg
+names(outdata)[3] <- "reg.start"
+names(outdata)[4] <- "reg.end"
+
+# reg.end - change from beginnings to ends of positions  
+outdata$reg.end <- apply(outdata[,c('chrom','reg.end')], 1, function(y) {
+  flt_pos_df[flt_pos_df$V1==y['chrom'] & flt_pos_df$V2 == as.numeric(y['reg.end']),]$V3
 })
 
 # Remove col1 (ID), initialize new output variable 
@@ -108,10 +112,10 @@ corr_start_end <- c()
 for (i in 1:nrow(outdata1)){
   #start of first position in segment
   start_index <- which(flt_pos_df$V1 == as.character(outdata[i,'chrom']) 
-                       & flt_pos_df$V2 == as.numeric(outdata[i,'loc.start']))
+                       & flt_pos_df$V2 == as.numeric(outdata[i,'reg.start']))
   #end of last position in segment
   end_index <- which(flt_pos_df$V1 == as.character(outdata[i,'chrom']) 
-                     & flt_pos_df$V3 == as.numeric(outdata[i,'loc.end']))
+                     & flt_pos_df$V3 == as.numeric(outdata[i,'reg.end']))
   #correction
   corr_start <- ifelse(i == 1 || outdata[i-1,'chrom']!=outdata[i,'chrom'], # start of chr
                        flt_pos_df[start_index,'V2'],
@@ -127,34 +131,39 @@ for (i in 1:nrow(outdata1)){
   corr_start_end <- c(corr_start_end, corr_start, corr_end)               
 }
 corr_se_matrix <- matrix(corr_start_end,ncol=2, byrow=T)
-outdata1$loc.start <- corr_se_matrix[,1]
-outdata1$loc.end <- corr_se_matrix[,2]
+outdata1$reg.start <- corr_se_matrix[,1]
+outdata1$reg.end <- corr_se_matrix[,2]
 
 # Calculate number of markers, read coverage mean and sd
-add_stats <- apply(outdata1[,c('chrom','loc.start','loc.end')], 1, function(y) {
+add_stats <- apply(outdata1[,c('chrom','reg.start','reg.end')], 1, function(y) {
   # Subset of positions for each region
   flt_pos_sub <- subset(flt_pos_df, V1==y['chrom']
-                        & V2>=as.numeric(y['loc.start']) 
-                        & V3<=as.numeric(y['loc.end']) )
+                        & V2>=as.numeric(y['reg.start']) 
+                        & V3<=as.numeric(y['reg.end']) )
   # distances between positions within region - all but first
   in_dist <- flt_pos_sub$V5[2:nrow(flt_pos_sub)]
   # chrom size from .sizes file 
   chr_size <- as.numeric(subset(size_df,V1==y['chrom']))[2] 
-  return(c(nrow(flt_pos_sub),mean(in_dist),sd(in_dist),
-           mean(flt_pos_sub$V4),sd(flt_pos_sub$V4),chr_size,
-           mean(flt_pos_sub$V5),sd(flt_pos_sub$V5),flt_pos_sub$V5[1]))
+  return(c(nrow(flt_pos_sub), # number of positions
+           mean(in_dist),sd(in_dist), # mean and sd of pairwise distances between positions inside region
+           mean(flt_pos_sub$V4),sd(flt_pos_sub$V4), # mean and sd coverage (actually, number of reads within positions)
+           chr_size, # size of chromosomes
+           mean(flt_pos_sub$V3-flt_pos_sub$V2),sum(flt_pos_sub$V3-flt_pos_sub$V2) # mean and total size of positions within the region
+           #mean(flt_pos_sub$V5),sd(flt_pos_sub$V5),flt_pos_sub$V5[1] # self-calculated pairwise distances
+           ))
 })
 # add to output
-outdata1$num.mark <- add_stats[1,]
-outdata1$in.dist.mean <- round(add_stats[2,], digits=0)
-outdata1$in.dist.sd <- round(add_stats[3,], digits=0)
-outdata1$reads.mean <- round(add_stats[4,], digits=2)
-outdata1$reads.sd <- round(add_stats[5,], digits=2)
+names(outdata1)[names(outdata1)=="num.mark"] <- "positions"
+outdata1$pd.mean <- round(add_stats[2,], digits=0)
+outdata1$pd.sd <- round(add_stats[3,], digits=0)
+outdata1$cov.mean <- round(add_stats[4,], digits=2) # 
+outdata1$cov.sd <- round(add_stats[5,], digits=2)
 outdata1$chrom.size <- add_stats[6,]
-outdata1$mean.test <- add_stats[7,]
-outdata1$sd.test <- add_stats[8,]
-outdata1$test <- add_stats[9,]
-outdata1$dist.by.size <- round(outdata1$in.dist.mean/outdata1$chrom.size, digits=6) # mean l_dist divided by chromosome size
+outdata1$pos.bp.mean <- round(add_stats[7,], digits=0)
+outdata1$pos.bp.total <- add_stats[8,]
+outdata1$pos.cov <- outdata1$pos.bp.total/(outdata1$reg.end-outdata1$reg.start)
+#outdata1$test <- add_stats[9,]
+#outdata1$dist.by.size <- round(outdata1$pd.mean/outdata1$chrom.size, digits=6) # mean l_dist divided by chromosome size
 
 # Write tsv file
 write.table(outdata1,file=paste(id,'.reg.tsv',sep=''),quote=F,sep='\t',
