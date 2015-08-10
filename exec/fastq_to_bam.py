@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import os
 import argparse
 
 
@@ -56,9 +57,6 @@ def rename_reads(in_file_name):
 def main(args):    
     assert args.fastq_F_file.endswith('.fastq') and args.fastq_R_file.endswith('.fastq') # does not accept gzipped and improperly named files
 
-    # rename reads
-    forward_rn_fq = rename_reads(args.fastq_F_file) # Filename returned. rn = renamed
-    reverse_rn_fq = rename_reads(args.fastq_R_file)
     
     # assign output filenames
     f_ca_fq_name = args.sample_name + '.F.ca.fastq'
@@ -69,15 +67,27 @@ def main(args):
     contam_sam_name = args.sample_name + '.' + contam_name + '.sam'
     
     # generate commands
-    # * supress bowtie2 warnings - too many for short reads
-    command_list = [
-            (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -n 3 -o ' + f_ca_fq_name + ' ' + forward_rn_fq),
-            (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -n 3 -o ' + r_ca_fq_name + ' ' + reverse_rn_fq),
-            ('rm ' + forward_rn_fq + ' ' + reverse_rn_fq),
-            (args.path_to_bowtie2 + ' -p ' + args.proc_bowtie2 + ' --local -x ' + args.target_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + target_sam_name),
-            (args.path_to_bowtie2 + ' -p ' + args.proc_bowtie2 + ' --local -x ' + args.contam_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + contam_sam_name)
-            ]
-    
+    # rename and cutadapt if not already done
+    if (not os.path.isfile(f_ca_fq_name) and not os.path.isfile(r_ca_fq_name)):    
+        # rename reads
+        forward_rn_fq = rename_reads(args.fastq_F_file) # Filename returned. rn = renamed
+        reverse_rn_fq = rename_reads(args.fastq_R_file)
+        command_list = [
+                (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -n 3 -o ' + f_ca_fq_name + ' ' + forward_rn_fq),
+                (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -n 3 -o ' + r_ca_fq_name + ' ' + reverse_rn_fq),
+                ('rm ' + forward_rn_fq + ' ' + reverse_rn_fq)]
+    else:
+        command_list = []
+        print 'Files with removed adapters exist. OK!'
+    # alignment to genomes - if not already done
+    if (not os.path.isfile(target_sam_name)) or (os.path.getsize(target_sam_name) == 0):
+        command_list.append(args.path_to_bowtie2 + ' -p ' + args.proc_bowtie2 + ' --local -x ' + args.target_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + target_sam_name)
+    else:
+        print 'Alignment to target genome exists. OK!'        
+    if (not os.path.isfile(contam_sam_name)) or (os.path.getsize(contam_sam_name) == 0):
+        command_list.append(args.path_to_bowtie2 + ' -p ' + args.proc_bowtie2 + ' --local -x ' + args.contam_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + contam_sam_name)
+    else:
+        print 'Alignment to contamination genome exists. OK!'             
     # run
     for command in command_list:
         sys.stderr.write(command+'\n') 
