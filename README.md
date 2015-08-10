@@ -17,7 +17,7 @@ Dependancies:
 
 3. Pysam python package (tested on v.0.8.1)
 
-4. bedtools (tested on v.2.17.0)
+4. bedtools (tested on v.2.17.0 and v.2.24.0)
 
 5. DNAcopy R package 
 
