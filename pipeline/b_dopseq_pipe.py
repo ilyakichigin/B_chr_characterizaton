@@ -12,6 +12,7 @@ import fastq_to_bam
 import contam_filter
 import bam_to_beds
 import control_stats
+import sample_stats
 
 def parse_command_line_arguments():
 
@@ -118,3 +119,13 @@ if __name__ == '__main__':
         sys.stderr.write('----region_dnacopy.R----\n')
         run_script(rd_command)
         sys.stderr.write('----Complete!----\n')
+    # Step 5. Calculate sample stats if these do not exist. Less detailed than control_stats.
+    stat_file = conf['sample'] + '.stat.txt'
+    if not os.path.isfile(stat_file):
+        ss_args = argparse.Namespace(sample=conf['sample'],
+                                    F_reads=conf['fastq_F_file'],R_reads=conf['fastq_R_file'],
+                                    t_genome=target_name,c_genome=contam_name)
+        sys.stderr.write('----sample_stats.py----\n')        
+        sample_stats.main(ss_args)
+        sys.stderr.write('----Complete!----\n')
+
