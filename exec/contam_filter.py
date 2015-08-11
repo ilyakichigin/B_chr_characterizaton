@@ -42,16 +42,17 @@ def sort_by_read_name(filename):
     return srt_name
 
 def sort_index(filename):
-    sys.stderr.write('Sorting and indexing output alignment: %s\n'%(filename))
     srt_name = filename[:-11] + '.bam' # remove 'unsort.bam'  
-    assert os.path.exists(srt_name) == False # output bam not sorted yet
-    pysam.sort(filename, srt_name[:-4])
-    pysam.index(srt_name)
-    sys.stderr.write('Output file: %s\n'%(srt_name))           
-    os.remove(filename) # remove unsorted file
-    sys.stderr.write('rm %s\n'%(filename))
-    return srt_name
-
+    if not os.path.exists(srt_name): # output bam not sorted yet
+        sys.stderr.write('Sorting and indexing output alignment: %s\n'%(filename))        
+        pysam.sort(filename, srt_name[:-4])
+        pysam.index(srt_name)
+        sys.stderr.write('Output file: %s\n'%(srt_name))           
+        os.remove(filename) # remove unsorted file
+        sys.stderr.write('rm %s\n'%(filename))
+        return srt_name
+    else:
+        print 'Sorted output alignment %s exists. OK!'%(srt_name)
 
 def compare_mapq(tname, cname, min_qual = 20, pre_sort_by_name = True):
     # read files - autodetect format, "rb" not specified

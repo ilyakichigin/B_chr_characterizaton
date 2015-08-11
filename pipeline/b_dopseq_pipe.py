@@ -66,17 +66,15 @@ if __name__ == '__main__':
         # Step 1. Perform fastq_to_bam if resulting sam files do not exist.
         target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
         contam_sam_file = '.'.join([conf['sample'],contam_name,'sam'])
-        if ((not os.path.isfile(target_sam_file) and not os.path.isfile(contam_sam_file)) 
-            or (os.path.getsize(target_sam_file) == 0)):
-            fb_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
-                                         sample_name=conf['sample'],target_genome=conf["target_genome"],
-                                         contam_genome=conf["contam_genome"],proc_bowtie2=conf["proc_bowtie2"],
-                                         path_to_cutadapt='cutadapt',path_to_bowtie2='bowtie2')
-            assert os.path.isfile(conf['fastq_F_file'])
-            assert os.path.isfile(conf['fastq_R_file'])
-            sys.stderr.write('----fastq_to_bam.py----\n')
-            fastq_to_bam.main(fb_args)
-            sys.stderr.write('----Complete!----\n')
+        fb_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
+                                     sample_name=conf['sample'],target_genome=conf["target_genome"],
+                                     contam_genome=conf["contam_genome"],proc_bowtie2=conf["proc_bowtie2"],
+                                     path_to_cutadapt='cutadapt',path_to_bowtie2='bowtie2')
+        assert os.path.isfile(conf['fastq_F_file'])
+        assert os.path.isfile(conf['fastq_R_file'])
+        sys.stderr.write('----fastq_to_bam.py----\n')
+        fastq_to_bam.main(fb_args)
+        sys.stderr.write('----Complete!----\n')
         cf_args = argparse.Namespace(target_file=target_sam_file,contam_file=contam_sam_file,
                                      min_quality=20,pre_sort_by_name=True)
         sys.stderr.write('----contam_filter.py----\n')        

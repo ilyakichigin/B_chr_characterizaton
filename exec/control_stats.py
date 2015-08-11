@@ -30,7 +30,8 @@ def parse_sizes(filename):
 
         for line in in_file:
             element_list = line.split('\t')
-            master_data.append((element_list[0], element_list[1]))
+            if len(element_list) == 2: # non-empty line with tab-delimited chromosome name and size
+                master_data.append((element_list[0], element_list[1]))
             
     return master_data
 

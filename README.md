@@ -17,10 +17,10 @@ Dependancies:
 
 3. Pysam python package (tested on v.0.8.1)
 
-4. bedtools (tested on v.2.17.0)
+4. bedtools (tested on v.2.17.0 and v.2.24.0)
 
 5. DNAcopy R package 
 
-6. (Optional - for subsequent variant calling) GATK (tested on v.3.3.0) and picard-tools (tested on v.1.125)
+6. (Optional - for subsequent variant calling and annotation) GATK (tested on v.3.3.0), picard-tools (tested on v.1.125), snpEff (tested on v.3.3.0)
 
 Scripts located into exec folder can be run independenly or as a part of the pipeline. Some of the scripts are not included in the pipelines, as these should use corrected regions as input. For more thorough description, see pipeline config files.
