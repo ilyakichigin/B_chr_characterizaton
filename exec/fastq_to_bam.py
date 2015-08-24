@@ -13,7 +13,7 @@ def parse_command_line_arguments():
                     Aligns pair of fastq read files to target and contamination genomes with preliminary DOP primer and Illumina adapter removal, prints out programs used to stdout. 
                     Required programs: cutadapt (tested on v.1.6), bowtie2 (tested on v.2.1.0, 2.2.4). 
                     1) Change read names to include '1' for forward and '2' for reverse read (Illumina-specific).
-                    2) Cut Illumina adapters and DOP primers.
+                    2) Cut Illumina adapters and DOP or WGA primers.
                     3) Perform paired end mapping to reference and contamination genomes.
                     """
                     )
@@ -32,6 +32,8 @@ def parse_command_line_arguments():
     parser.add_argument("--path_to_bowtie2", default="bowtie2", help="path to bowtie2 binary")
 
     parser.add_argument("-p", "--proc_bowtie2", default="1", help="number of processors allocated for bowtie2. Default - 1.")
+
+    parser.add_argument("--wga", default="false", help="change trimmed primers from DOP to WGA, use true if need to change to WGA")
 
     return parser.parse_args()
    
@@ -72,9 +74,15 @@ def main(args):
         # rename reads
         forward_rn_fq = rename_reads(args.fastq_F_file) # Filename returned. rn = renamed
         reverse_rn_fq = rename_reads(args.fastq_R_file)
+        # usage of primers - DOP or WGA
+        primer = 'CCACATNNNNNNCTCGAGTCGG'
+        rev_primer = 'CCGACTCGAGNNNNNNATGTGG'
+        if args.wga != 'false':
+            primer = 'TTGTGTTGGGTGTGTTTGG'
+            rev_primer = 'CCAAACACACCCAACACAA'
         command_list = [
-                (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -n 3 -o ' + f_ca_fq_name + ' ' + forward_rn_fq),
-                (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -n 3 -o ' + r_ca_fq_name + ' ' + reverse_rn_fq),
+                (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a ' + primer + ' -g ' + rev_primer + ' -n 3 -o ' + f_ca_fq_name + ' ' + forward_rn_fq),
+                (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a ' + primer + ' -g ' + rev_primer + ' -n 3 -o ' + r_ca_fq_name + ' ' + reverse_rn_fq),
                 ('rm ' + forward_rn_fq + ' ' + reverse_rn_fq)]
     else:
         command_list = []
