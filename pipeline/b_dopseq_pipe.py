@@ -69,7 +69,7 @@ if __name__ == '__main__':
         fb_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
                                      sample_name=conf['sample'],target_genome=conf["target_genome"],
                                      contam_genome=conf["contam_genome"],proc_bowtie2=conf["proc_bowtie2"],
-                                     path_to_cutadapt='cutadapt',path_to_bowtie2='bowtie2',wga=conf["wga"])
+                                     path_to_cutadapt='cutadapt',path_to_bowtie2='bowtie2',ampl=conf["ampl"])
         assert os.path.isfile(conf['fastq_F_file'])
         assert os.path.isfile(conf['fastq_R_file'])
         sys.stderr.write('----fastq_to_bam.py----\n')
