@@ -10,18 +10,12 @@ def parse_command_line_arguments():
 
     parser = argparse.ArgumentParser(description=    
                     """
-                    Aligns pair of fastq read files to target and contamination genomes with preliminary DOP primer and Illumina adapter removal, prints out programs used to stdout. 
-                    Required programs: cutadapt (tested on v.1.6), bowtie2 (tested on v.2.1.0, 2.2.4). 
-                    1) Change read names to include '1' for forward and '2' for reverse read (Illumina-specific).
-                    2) Cut Illumina adapters and DOP or WGA primers.
-                    3) Perform paired end mapping to reference and contamination genomes.
+                    Aligns paired fastq files (preliminary processed with fastq_clean.py) to target and contamination genomes, prints out programs used to stdout. 
+                    Required program: bowtie2 (tested on v.2.1.0, 2.2.4). 
                     """
                     )
-    parser.add_argument("fastq_F_file", help="fastq file with forward reads (.fastq)")
 
-    parser.add_argument("fastq_R_file", help="fastq file with reverse reads (.fastq)")
-
-    parser.add_argument("sample_name", help="output name of sample (can be anything, in our case CFA12, VVUB and so on)")
+    parser.add_argument("sample_name", help="sample name - prefix of input files processed with cutadapt")
 
     parser.add_argument("-t", "--target_genome", help="base name of reference genome bowtie2 index (e.g. canFam3, bosTau7)")
 
@@ -33,72 +27,29 @@ def parse_command_line_arguments():
 
     parser.add_argument("-p", "--proc_bowtie2", default="1", help="number of processors allocated for bowtie2. Default - 1.")
 
-    parser.add_argument("--ampl", default="dop", help="Amplification protocol - used to remove specific primers. Possible values: dop, wga")
-
     return parser.parse_args()
-   
-def rename_reads(in_file_name):
-
-    # Rename reads in fastq files - remove space between cluster name and number: 1 for F, 2 for R. 
-
-    with open(in_file_name, 'rU') as in_file:
-        in_file_base = in_file_name.split('/')[-1] # output to current folder
-        out_file_name = '.'.join(in_file_base.split('.')[:-1]+['rn','fastq'])
-        sys.stderr.write("Renaming reads in %s. Writing to %s.\n" % (in_file_name,out_file_name))
-        with open(out_file_name, 'w') as out_file:
-            for line in in_file:
-                line_list = line.split(' ')
-                if line.startswith('@') and len(line_list) > 1:
-                    out_line = line_list[0] + line_list[1] # remove separating space
-                else:
-                    out_line = line
-                out_file.write(out_line)
-
-    return out_file_name
 
 def main(args):    
-    assert args.fastq_F_file.endswith('.fastq') and args.fastq_R_file.endswith('.fastq') # does not accept gzipped and improperly named files
 
-    
-    # assign output filenames
+    # assign input filenames
     f_ca_fq_name = args.sample_name + '.F.ca.fastq'
     r_ca_fq_name = args.sample_name + '.R.ca.fastq'
+    # assign output filenames
     target_name = args.target_genome.split('/')[-1]
     contam_name = args.contam_genome.split('/')[-1]
-    target_sam_name = args.sample_name + '.' + target_name + '.sam' # simplified name: sample.genome.sam. 'ca' and 'pe not included (compared to previous versions)
+    target_sam_name = args.sample_name + '.' + target_name + '.sam' # simplified name: sample.genome.sam. 'ca' and 'pe not included
     contam_sam_name = args.sample_name + '.' + contam_name + '.sam'
     
-    # generate commands
-    # rename and cutadapt if not already done
-    if (not os.path.isfile(f_ca_fq_name) and not os.path.isfile(r_ca_fq_name)):    
-        # rename reads
-        forward_rn_fq = rename_reads(args.fastq_F_file) # Filename returned. rn = renamed
-        reverse_rn_fq = rename_reads(args.fastq_R_file)
-        # remove Illumina unversal adapter and primers depending on the protocol
-        if args.ampl == 'dop':
-            primer = 'CCACATNNNNNNCTCGAGTCGG'
-            rev_primer = 'CCGACTCGAGNNNNNNATGTGG'
-        elif args.ampl == 'wga':
-            primer = 'TTGTGTTGGGTGTGTTTGG'
-            rev_primer = 'CCAAACACACCCAACACAA'
-        else:
-             raise Exception('Unknown amplification protocol. Known ones - dop, wga')
-        command_list = [
-                (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a ' + primer + ' -g ' + rev_primer + ' -n 3 -o ' + f_ca_fq_name + ' ' + forward_rn_fq),
-                (args.path_to_cutadapt + ' -a AGATCGGAAGAGC -a ' + primer + ' -g ' + rev_primer + ' -n 3 -o ' + r_ca_fq_name + ' ' + reverse_rn_fq),
-                ('rm ' + forward_rn_fq + ' ' + reverse_rn_fq)]
-    else:
-        command_list = []
-        print 'Files with removed adapters exist. OK!'
     # alignment to genomes - if not already done
+    command_list = []
     if (not os.path.isfile(target_sam_name)) or (os.path.getsize(target_sam_name) == 0):
         command_list.append(args.path_to_bowtie2 + ' -p ' + args.proc_bowtie2 + ' --local -x ' + args.target_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + target_sam_name)
     else:
-        print 'Alignment to target genome exists. OK!'        
+        print 'Alignment to target genome exists. OK!'
     if (not os.path.isfile(contam_sam_name)) or (os.path.getsize(contam_sam_name) == 0):
         command_list.append(args.path_to_bowtie2 + ' -p ' + args.proc_bowtie2 + ' --local -x ' + args.contam_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + contam_sam_name)
     else:
-        print 'Alignment to contamination genome exists. OK!'             
+        print 'Alignment to contamination genome exists. OK!'
     # run
     for command in command_list:
         sys.stderr.write(command+'\n') 
@@ -112,5 +63,3 @@ def main(args):
 
 if __name__ == '__main__':
     main(parse_command_line_arguments())
-
-    
