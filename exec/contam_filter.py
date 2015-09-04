@@ -17,6 +17,7 @@ def parse_command_line_arguments():
                     1) (optional) sort input alignments by read name without cleanup.
                     2) Perform contamination analysis.
                     3) sort and index resulting alignments with cleanup.
+                    4) Remove input files - all read positions are preserved within three generated files
                     """
                     )
     parser.add_argument("target_file",
@@ -102,6 +103,9 @@ def main(args):
    
     for filename in outnames:
         sort_index(filename)
+    
+    os.remove(args.contam_file)
+    os.remove(args.target_file)
 
 if __name__ == '__main__':
     main(parse_command_line_arguments())
