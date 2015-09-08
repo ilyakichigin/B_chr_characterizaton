@@ -1,10 +1,10 @@
 # Introduction
 
-DOPseq_analyzer is a a set of tools for processing of Illumina sequencing data obtained from Degenerate Oligonucleotide Primed PCR libraries of isolated (flow sorted or microdissected) chromosomes. The result is the division of the genome used as reference into regions, which can be further interpreted as target (specific to isolated chromosomes) or contamination (non-specific). Note that these regions cannot be used 'as is' and require manual inspection and correction.
+DOPseq_analyzer is a a set of tools for processing of Illumina sequencing data obtained from isolated (flow sorted or microdissected) chromosomes amplified with Degenerate-Oligonucleotide-Primed PCR (DOP-PCR) or WGA. The result is the division of the genome used as reference into regions, which can be further interpreted as target (specific to isolated chromosomes) or contamination (non-specific). Note that these regions cannot be used 'as is' and require manual inspection and correction. 
 
 Currently, two pipelines are implemented: 
 
-1. Analysis of B chromosomes (pipeline/b_dopseq_pipe.py) includes read trimming, alignment to reference genome, contamination filtering, region calling and statistics calculation. It is suitable for reference genomes assembled up to the chromosomes.
+1. Analysis of B chromosomes (pipeline/b_dopseq_pipe.py) includes read trimming, alignment to reference genome, contamination filtering, region calling and statistics calculation. It is suitable for reference genomes assembled up to the chromosomes. Details on processing steps and additional routines for repetitive DNA characterization with RepeatExplorer and variant calling are described at the end of the configuration file (pipeline/b_dopseq_pipe.config)
 2. Analysis of anole microchromosomes (anolis/pipeline/anolis_dopseq_pipe.py) includes similar steps. It is optimized for reference genomes consisting of scaffolds and has a possibility to handle WGA libraries.
 
 # Installation and usage

@@ -8,6 +8,7 @@ import sys
 exec_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..","exec"))
 sys.path.append(exec_path)
 
+import fastq_clean
 import fastq_to_bam
 import contam_filter
 import bam_to_beds
@@ -57,30 +58,42 @@ if __name__ == '__main__':
     conf = parse_config(args.config_file)
     #dry_run = args.dry_run
     # !need to add executables check!
-    target_name = conf["target_genome"].split('/')[-1]
-    contam_name = conf["contam_genome"].split('/')[-1]
-    # Steps 1&2. fastq_to_bam and contam_filter if filetered bam does not exist.    
-    base_name = '.'.join([conf['sample'],target_name,'filter'])
-    filtered_bam_file = base_name+'.bam'
-    if not os.path.isfile(filtered_bam_file):    
-        # Step 1. Perform fastq_to_bam if resulting sam files do not exist.
-        target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
-        contam_sam_file = '.'.join([conf['sample'],contam_name,'sam'])
-        fb_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
-                                     sample_name=conf['sample'],target_genome=conf["target_genome"],
-                                     contam_genome=conf["contam_genome"],proc_bowtie2=conf["proc_bowtie2"],
-                                     path_to_cutadapt='cutadapt',path_to_bowtie2='bowtie2',ampl=conf["ampl"])
+    # Step 1. fastq_clean if trimmed read fastq do not exists
+    f_trim_fq = conf['sample']+'.F.ca.fastq'
+    r_trim_fq = conf['sample']+'.R.ca.fastq'
+    if not os.path.isfile(f_trim_fq) and not os.path.isfile(r_trim_fq):
+        fc_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
+                                     sample_name=conf['sample'],path_to_cutadapt='cutadapt',
+                                     ampl=conf["ampl"])
         assert os.path.isfile(conf['fastq_F_file'])
         assert os.path.isfile(conf['fastq_R_file'])
+        sys.stderr.write('----fastq_clean.py----\n')
+        fastq_clean.main(fc_args)
+        sys.stderr.write('----Complete!----\n')
+        
+    # Steps 2&3. fastq_to_bam and contam_filter if filetered bam does not exist.
+    target_name = conf["target_genome"].split('/')[-1]
+    contam_name = conf["contam_genome"].split('/')[-1]
+    base_name = '.'.join([conf['sample'],target_name,'filter'])
+    filtered_bam_file = base_name+'.bam'
+    
+    if not os.path.isfile(filtered_bam_file):    
+        # Step 2. Perform fastq_to_bam if resulting sam files do not exist.
+        target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
+        contam_sam_file = '.'.join([conf['sample'],contam_name,'sam'])
+        fb_args = argparse.Namespace(sample_name=conf['sample'],
+                                     target_genome=conf["target_genome"],contam_genome=conf["contam_genome"],
+                                     path_to_bowtie2='bowtie2',proc_bowtie2=conf["proc_bowtie2"])
         sys.stderr.write('----fastq_to_bam.py----\n')
         fastq_to_bam.main(fb_args)
         sys.stderr.write('----Complete!----\n')
+        # Step 3. contam_filter - remove contamination from the specified genome
         cf_args = argparse.Namespace(target_file=target_sam_file,contam_file=contam_sam_file,
                                      min_quality=20,pre_sort_by_name=True)
         sys.stderr.write('----contam_filter.py----\n')        
         contam_filter.main(cf_args)
         sys.stderr.write('----Complete!----\n')
-    # Step 3. Convert bam_to_beds with reads and positions if these files do not exist.
+    # Step 4. Convert bam_to_beds with reads and positions if these files do not exist.
     reads_bed_file = base_name+'.reads.bed'
     pos_bed_file = base_name+'.pos.bed'
     if (not os.path.isfile(reads_bed_file) and not os.path.isfile(pos_bed_file)):
@@ -88,7 +101,7 @@ if __name__ == '__main__':
         sys.stderr.write('----bam_to_beds.py----\n')
         bam_to_beds.main(btb_args)
         sys.stderr.write('----Complete!----\n')
-    # Step 3a. Calculate control_stats if these do not exist.
+    # Step 4a. Calculate control_stats if these do not exist.
     stat_file = base_name+'.chrom.tsv'
     if not os.path.isfile(stat_file):
         cs_args = argparse.Namespace(bed_basename='.'.join([conf['sample'],target_name,'filter']),
@@ -101,14 +114,14 @@ if __name__ == '__main__':
             control_stats.main(cs_args)    
             sys.stdout = saveout
         sys.stderr.write('----Complete!----\n')
-    # Step 3b. Draw control_plots.R if these do not exist.
+    # Step 4b. Draw control_plots.R if these do not exist.
     control_plot_file = base_name+'.chrom.pdf'
     if not os.path.isfile(control_plot_file):
         cp_command = [exec_path+'/control_plots.R',pos_bed_file,conf['sizes_file']]
         sys.stderr.write('----control_plots.R----\n')
         run_script(cp_command)
         sys.stderr.write('----Complete!----\n')
-    # Step 4. Perform region_dnacopy.R if regions do not exist.
+    # Step 5. Perform region_dnacopy.R if regions do not exist.
     regions_table = base_name+'.reg.tsv'
     regions_plot = base_name+'.reg.pdf'
     if not os.path.isfile(regions_table) or not os.path.isfile(regions_plot):
@@ -117,7 +130,7 @@ if __name__ == '__main__':
         sys.stderr.write('----region_dnacopy.R----\n')
         run_script(rd_command)
         sys.stderr.write('----Complete!----\n')
-    # Step 5. Calculate sample stats if these do not exist. Less detailed than control_stats.
+    # Step 6. Calculate sample stats if these do not exist. Less detailed than control_stats.
     stat_file = conf['sample'] + '.stat.txt'
     if not os.path.isfile(stat_file):
         ss_args = argparse.Namespace(sample=conf['sample'],

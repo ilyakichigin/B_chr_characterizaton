@@ -21,8 +21,6 @@ def parse_command_line_arguments():
 
     parser.add_argument("-c", "--contam_genome", default="hg19", help="base name for contamination genome bowtie2 index (default hg19)")
 
-    parser.add_argument("--path_to_cutadapt", default="cutadapt", help="path to cutadapt binary")
-
     parser.add_argument("--path_to_bowtie2", default="bowtie2", help="path to bowtie2 binary")
 
     parser.add_argument("-p", "--proc_bowtie2", default="1", help="number of processors allocated for bowtie2. Default - 1.")

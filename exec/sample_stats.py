@@ -67,7 +67,7 @@ def main(args):
     stats.extend([i,pos_size,sum(l)/float(len(l))])
 
     stats = [str(i) for i in stats]
-    with open(args.sample + '.stat.txt', 'w') as outf:
+    with open(args.sample + '.stats.txt', 'w') as outf:
         outf.write( '\t'.join(stats)+'\n' )
 
 if __name__ == '__main__':
