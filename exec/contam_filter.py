@@ -26,11 +26,6 @@ def parse_command_line_arguments():
                         help="sam/bam alignment to contamination genome")
     parser.add_argument("-m", '--min_quality', default=20,
                         help="Minimum quality for filtered file. Default - 20.")
-    parser.add_argument("-a", "--pre_sort_by_name", action="store_true",
-                        help="perform preliminary bam sorting by read name. Do not clean up.")
-    #parser.add_argument("-p", "--post_sort_index", action="store_true",
-    #                    help="perform post sorting by coordinate and indexing of resulting bams. Do clean up.")
-
     return parser.parse_args()
 
    
@@ -40,6 +35,8 @@ def sort_by_read_name(filename):
     assert os.path.exists(srt_name) == False # input bam not name sorted yet
     pysam.sort('-n', filename, srt_name[:-4])
     sys.stderr.write('Output file: %s\n'%(srt_name))
+    os.remove(filename) # remove unsorted file
+    sys.stderr.write('rm %s\n'%(filename))
     return srt_name
 
 def sort_index(filename):
@@ -55,15 +52,12 @@ def sort_index(filename):
     else:
         print 'Sorted output alignment %s exists. OK!'%(srt_name)
 
-def compare_mapq(tname, cname, min_qual = 20, pre_sort_by_name = True):
+def compare_mapq(tname, cname, min_qual = 20):
+    # inputs: sorted_bam_target.ns.bam, sorted_bam_contam.ns.bam
     # read files - autodetect format, "rb" not specified
-    if pre_sort_by_name:
-        tst = -7
-    else:
-        tst = -4
-    filter_filename = tname[:tst]+'.filter.unsort.bam'   
-    contam_filename = cname[:tst]+'.contam.unsort.bam'   
-    unmap_filename = tname[:tst]+'.unmap.unsort.bam'   
+    filter_filename = tname[:-7]+'.filter.unsort.bam'   
+    contam_filename = cname[:-7]+'.contam.unsort.bam'   
+    unmap_filename = tname[:-7]+'.unmap.unsort.bam'   
    
     with pysam.AlignmentFile(tname) as tfile, pysam.AlignmentFile(cname) as cfile:
         sys.stderr.write('Comparing MAPQs. Target: %s, Contam: %s\n'%(tname,cname))        
@@ -85,8 +79,7 @@ def compare_mapq(tname, cname, min_qual = 20, pre_sort_by_name = True):
         unmap_file.close()
 
     sys.stderr.write('Output files: %s, %s, %s\n'%(filter_filename, contam_filename, unmap_filename))
-    # remove input files
-    os.remove(tname)
+    os.remove(tname) # remove input files
     os.remove(cname)
     sys.stderr.write('rm %s %s\n'%(tname, cname))
 
@@ -94,18 +87,11 @@ def compare_mapq(tname, cname, min_qual = 20, pre_sort_by_name = True):
 
 def main(args):
     args.min_quality = int(args.min_quality)
-
-    if args.pre_sort_by_name:
-        args.contam_file = sort_by_read_name(args.contam_file)
-        args.target_file = sort_by_read_name(args.target_file)
-
-    outnames = compare_mapq(args.target_file, args.contam_file, args.min_quality, args.pre_sort_by_name)
-   
+    args.contam_file = sort_by_read_name(args.contam_file)
+    args.target_file = sort_by_read_name(args.target_file)
+    outnames = compare_mapq(args.target_file, args.contam_file, args.min_quality)
     for filename in outnames:
         sort_index(filename)
-    
-    os.remove(args.contam_file)
-    os.remove(args.target_file)
 
 if __name__ == '__main__':
     main(parse_command_line_arguments())

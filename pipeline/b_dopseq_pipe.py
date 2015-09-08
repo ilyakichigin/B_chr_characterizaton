@@ -89,7 +89,7 @@ if __name__ == '__main__':
         sys.stderr.write('----Complete!----\n')
         # Step 3. contam_filter - remove contamination from the specified genome
         cf_args = argparse.Namespace(target_file=target_sam_file,contam_file=contam_sam_file,
-                                     min_quality=20,pre_sort_by_name=True)
+                                     min_quality=20)
         sys.stderr.write('----contam_filter.py----\n')        
         contam_filter.main(cf_args)
         sys.stderr.write('----Complete!----\n')
