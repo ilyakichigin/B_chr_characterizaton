@@ -81,9 +81,9 @@ if __name__ == '__main__':
         # Step 2. Perform fastq_to_bam if resulting sam files do not exist.
         target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
         contam_sam_file = '.'.join([conf['sample'],contam_name,'sam'])
-        fb_args = argparse.Namespace(sample_name=conf['sample'],
-                                     target_genome=conf["target_genome"],contam_genome=conf["contam_genome"],
-                                     path_to_bowtie2='bowtie2',proc_bowtie2=conf["proc_bowtie2"])
+        fb_args = argparse.Namespace(sample_name=conf['sample'], 
+                                     target_genome=conf["target_genome"], contam_genome=conf["contam_genome"], 
+                                     path_to_bowtie2='bowtie2', bowtie2_args=conf["bowtie2_args"][1:-1])
         sys.stderr.write('----fastq_to_bam.py----\n')
         fastq_to_bam.main(fb_args)
         sys.stderr.write('----Complete!----\n')
@@ -134,8 +134,8 @@ if __name__ == '__main__':
     stat_file = conf['sample'] + '.stat.txt'
     if not os.path.isfile(stat_file):
         ss_args = argparse.Namespace(sample=conf['sample'],
-                                    F_reads=conf['fastq_F_file'],R_reads=conf['fastq_R_file'],
-                                    t_genome=target_name,c_genome=contam_name)
+                                    F_reads=conf['fastq_F_file'], R_reads=conf['fastq_R_file'],
+                                    t_genome=target_name, c_genome=contam_name)
         sys.stderr.write('----sample_stats.py----\n')        
         sample_stats.main(ss_args)
         sys.stderr.write('----Complete!----\n')

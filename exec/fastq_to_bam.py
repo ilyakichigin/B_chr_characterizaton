@@ -23,7 +23,7 @@ def parse_command_line_arguments():
 
     parser.add_argument("--path_to_bowtie2", default="bowtie2", help="path to bowtie2 binary")
 
-    parser.add_argument("-p", "--proc_bowtie2", default="1", help="number of processors allocated for bowtie2. Default - 1.")
+    parser.add_argument("-b", "--bowtie2_args", default="-p 1", help="Additional parameters for bowtie2 specified as quoted string. For reference, see bowtie2 manual.")
 
     return parser.parse_args()
 
@@ -41,11 +41,11 @@ def main(args):
     # alignment to genomes - if not already done
     command_list = []
     if (not os.path.isfile(target_sam_name)) or (os.path.getsize(target_sam_name) == 0):
-        command_list.append(args.path_to_bowtie2 + ' -p ' + args.proc_bowtie2 + ' --local -x ' + args.target_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + target_sam_name)
+        command_list.append(args.path_to_bowtie2 + ' ' + args.bowtie2_args + ' -x ' + args.target_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + target_sam_name)
     else:
         print 'Alignment to target genome exists. OK!'
     if (not os.path.isfile(contam_sam_name)) or (os.path.getsize(contam_sam_name) == 0):
-        command_list.append(args.path_to_bowtie2 + ' -p ' + args.proc_bowtie2 + ' --local -x ' + args.contam_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + contam_sam_name)
+        command_list.append(args.path_to_bowtie2 + ' ' + args.bowtie2_args + ' -x ' + args.contam_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + contam_sam_name)
     else:
         print 'Alignment to contamination genome exists. OK!'
     # run
@@ -54,7 +54,7 @@ def main(args):
         process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
         (out, err) = process.communicate()
         sys.stdout.write(out)
-        # ignore bowtie2 warnings of too short reads. All sterr is stored in memory!         
+        # ignore bowtie2 warnings for too short reads. All sterr is stored in memory!         
         for line in err.splitlines(True):
             if ('Warning: skipping mate' not in line) and ('Warning: minimum score function' not in line):
                 sys.stderr.write(line)
