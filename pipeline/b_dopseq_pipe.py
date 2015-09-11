@@ -52,7 +52,8 @@ def run_script(command, run=False):
     sys.stderr.write(' '.join(command)+'\n') 
     process = subprocess.Popen(command) 
     process.wait()
-    
+    if process.returncode != 0: # error raised
+        sys.exit()
 if __name__ == '__main__':
     args = parse_command_line_arguments()
     conf = parse_config(args.config_file)
@@ -68,7 +69,10 @@ if __name__ == '__main__':
         assert os.path.isfile(conf['fastq_F_file'])
         assert os.path.isfile(conf['fastq_R_file'])
         sys.stderr.write('----fastq_clean.py----\n')
-        fastq_clean.main(fc_args)
+        try:
+            fastq_clean.main(fc_args)
+        except:
+            sys.exit(1)
         sys.stderr.write('----Complete!----\n')
         
     # Steps 2&3. fastq_to_bam and contam_filter if filetered bam does not exist.
@@ -85,13 +89,19 @@ if __name__ == '__main__':
                                      target_genome=conf["target_genome"], contam_genome=conf["contam_genome"], 
                                      path_to_bowtie2='bowtie2', bowtie2_args=conf["bowtie2_args"][1:-1])
         sys.stderr.write('----fastq_to_bam.py----\n')
-        fastq_to_bam.main(fb_args)
+        try:
+            fastq_to_bam.main(fb_args)
+        except:
+            sys.exit(1)
         sys.stderr.write('----Complete!----\n')
         # Step 3. contam_filter - remove contamination from the specified genome
         cf_args = argparse.Namespace(target_file=target_sam_file,contam_file=contam_sam_file,
                                      min_quality=20)
-        sys.stderr.write('----contam_filter.py----\n')        
-        contam_filter.main(cf_args)
+        sys.stderr.write('----contam_filter.py----\n')
+        try:
+            contam_filter.main(cf_args)
+        except:
+            sys.exit(1)
         sys.stderr.write('----Complete!----\n')
     # Step 4. Convert bam_to_beds with reads and positions if these files do not exist.
     reads_bed_file = base_name+'.reads.bed'
@@ -99,7 +109,10 @@ if __name__ == '__main__':
     if (not os.path.isfile(reads_bed_file) and not os.path.isfile(pos_bed_file)):
         btb_args = argparse.Namespace(bam_file=filtered_bam_file,path_to_bedtools='bedtools')
         sys.stderr.write('----bam_to_beds.py----\n')
-        bam_to_beds.main(btb_args)
+        try:
+            bam_to_beds.main(btb_args)
+        except:
+            sys.exit(1)
         sys.stderr.write('----Complete!----\n')
     # Step 4a. Calculate control_stats if these do not exist.
     stat_file = base_name+'.chrom.tsv'
@@ -110,9 +123,12 @@ if __name__ == '__main__':
         sys.stderr.write('----control_stats.py----\n')        
         saveout = sys.stdout        
         with open(stat_file,'w') as f:
-            sys.stdout = f
-            control_stats.main(cs_args)    
-            sys.stdout = saveout
+            sys.stdout = f # replace stdout with file
+            try:
+                control_stats.main(cs_args)
+            except:
+                sys.exit(1)
+            sys.stdout = saveout # return std
         sys.stderr.write('----Complete!----\n')
     # Step 4b. Draw control_plots.R if these do not exist.
     control_plot_file = base_name+'.chrom.pdf'
@@ -137,6 +153,9 @@ if __name__ == '__main__':
                                     F_reads=conf['fastq_F_file'], R_reads=conf['fastq_R_file'],
                                     t_genome=target_name, c_genome=contam_name)
         sys.stderr.write('----sample_stats.py----\n')        
-        sample_stats.main(ss_args)
+        try:
+            sample_stats.main(ss_args)
+        except:
+            sys.exit(1)
         sys.stderr.write('----Complete!----\n')
 
