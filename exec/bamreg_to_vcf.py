@@ -81,7 +81,7 @@ def run_haplotypecaller(bam_file, path_to_gatk, genome_fasta, gatk_mem):
     
     print '-----run-haplotypecaller'
     assert bam_file.endswith('.bam')
-    vcf_file = bam_file[:-4]+'.hc.vcf'
+    vcf_file = bam_file[:-3]+'hc.vcf'
     if not os.path.isfile(vcf_file):
         hc_command = ['java','-Xmx'+gatk_mem,'-jar',path_to_gatk,
                       '-T','HaplotypeCaller',
@@ -106,7 +106,8 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
 
     print '-----select-region-variants'
     assert bam_file.endswith('.bam')
-    with open(bed_file) as infile: # bed sanity check
+    # bed sanity check
+    with open(bed_file) as infile: 
         for line in infile:
             if len(line) > 1: # non-empty lines
                 assert line.startswith('chr'), "Improper chromosome name in bed file:\n%s" % line
@@ -114,8 +115,12 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
                 assert len(ll) == 3, "Incorrect separation or column number in bed file:\n%s" % line
                 assert int(ll[1]) < int(ll[2]), "Start coordinate is larger than the end in bed file:\n%s" % line                 
 
-    vcf_file = bam_file[:-4]+'.hc.vcf'
-    reg_vcf_file = bam_file[:-4]+'.reg.hc.vcf'
+    vcf_file = bam_file[:-3]+'hc.vcf'
+    reg_vcf_file = bam_file[:-3]+'hc.reg.vcf'
+    reghz_vcf_file = bam_file[:-3]+'hc.reghz.vcf'
+
+    # select region variants
+
     if not os.path.isfile(reg_vcf_file):
         sv_command = ['java','-Xmx1g','-jar',path_to_gatk,
                       '-T','SelectVariants',
@@ -131,32 +136,55 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
             sys.exit()
     else:
         print reg_vcf_file + ' region vcf file exists. OK!'
-    
-    # calculate statistics of the resuling file 
 
-    reg_vcf_stat_file = bam_file[:-4]+'.reg.hc.txt'
-    if not os.path.isfile(reg_vcf_stat_file) and stats:
-        ve_command = ['java','-Xmx1g','-jar',path_to_gatk,
-                      '-T','VariantEval',
+    # select region heterozygous variants
+
+    sample_name = bam_file.split('.')[0]
+    if not os.path.isfile(reghz_vcf_file):
+        sv_command = ['java','-Xmx1g','-jar',path_to_gatk,
+                      '-T','SelectVariants',
                       '-R',genome_fasta,
-                      '--eval',reg_vcf_file,
-                      '-o',reg_vcf_stat_file,
-                      '-noEV', '-noST',
-                      '-EV', 'CountVariants',
-                      '-EV', 'TiTvVariantEvaluator',
-                      '-EV', 'IndelSummary',
-                      '-EV', 'MultiallelicSummary',
-                      '-EV', 'ValidationReport',
-                      '-ST', 'Sample',
-                      '-l', 'INFO']
-        print ' '.join(ve_command)
-        process = subprocess.Popen(ve_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                      '--variant',vcf_file,
+                      '-select','vc.getGenotype(\'%s\').isHet()' % (sample_name),
+                      '-L',bed_file,
+                      '-o',reghz_vcf_file]
+        print ' '.join(sv_command)
+        process = subprocess.Popen(sv_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (out, err) = process.communicate()
         if process.returncode != 0:
             sys.stderr.write(err)
             sys.exit()
     else:
-        print reg_vcf_stat_file + ' region variant stat file exists. OK!'
+        print reghz_vcf_file + ' region heterozygous vcf file exists. OK!'
+    
+    # calculate statistics of the resuling region vcfs 
+
+    reg_vcf_stat_file = bam_file[:-4]+'.hc.reg.txt'
+    reghz_vcf_stat_file = bam_file[:-4]+'.hc.reghz.txt'
+    for (vcf_file, stat_file) in [(reg_vcf_file,reg_vcf_stat_file),
+                                  (reghz_vcf_file,reghz_vcf_stat_file)]:
+        if not os.path.isfile(stat_file) and stats:
+            ve_command = ['java','-Xmx1g','-jar',path_to_gatk,
+                          '-T','VariantEval',
+                          '-R',genome_fasta,
+                          '--eval',vcf_file,
+                          '-o',stat_file,
+                          '-noEV', '-noST',
+                          '-EV', 'CountVariants',
+                          '-EV', 'TiTvVariantEvaluator',
+                          '-EV', 'IndelSummary',
+                          '-EV', 'MultiallelicSummary',
+                          '-EV', 'ValidationReport',
+                          '-ST', 'Sample',
+                          '-l', 'INFO']
+            print ' '.join(ve_command)
+            process = subprocess.Popen(ve_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            (out, err) = process.communicate()
+            if process.returncode != 0:
+                sys.stderr.write(err)
+                sys.exit()
+        else:
+            print stat_file + ' region variant stat file exists. OK!'
     print '-----'
 
 def annotate_region_variants(bam_file, path_to_snpEff, genome_snpEff):
@@ -165,8 +193,8 @@ def annotate_region_variants(bam_file, path_to_snpEff, genome_snpEff):
     
     # annotate variants for positions residing inside target regions
     
-    vcf_file = bam_file[:-3]+'reg.hc.vcf'
-    ann_vcf_file = bam_file[:-3]+'ann.vcf'
+    vcf_file = bam_file[:-3]+'hc.reg.vcf'
+    ann_vcf_file = bam_file[:-3]+'hc.reg.ann.vcf'
     if not os.path.isfile(ann_vcf_file):
         se_command = ['java','-Xmx1g','-jar',path_to_snpEff,
                           '-stats',ann_vcf_file+'.csv', '-csvStats',
@@ -179,12 +207,29 @@ def annotate_region_variants(bam_file, path_to_snpEff, genome_snpEff):
                 sys.stderr.write(err)
                 sys.exit()
     else:
-        print ann_vcf_file + ' annotated vcf file exists. OK!'
+        print ann_vcf_file + ' annotated region vcf file exists. OK!'
 
+    vcf_file = bam_file[:-3]+'hc.reghz.vcf'
+    ann_vcf_file = bam_file[:-3]+'hc.reghz.ann.vcf'
+    if not os.path.isfile(ann_vcf_file):
+        se_command = ['java','-Xmx1g','-jar',path_to_snpEff,
+                          '-stats',ann_vcf_file+'.csv', '-csvStats',
+                          genome_snpEff, vcf_file]
+        with open(ann_vcf_file,'w') as out_vcf:   
+            print ' '.join(se_command)
+            process = subprocess.Popen(se_command, stdout=out_vcf, stderr=subprocess.PIPE)
+            (out, err) = process.communicate()
+            if process.returncode != 0:
+                sys.stderr.write(err)
+                sys.exit()
+    else:
+        print ann_vcf_file + ' annotated heterozygous region vcf file exists. OK!'
     
     print '-----'
     
 def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
+
+    # calculate statistics of the annotated file
 
     print '-----calc-annot-stats'
 
@@ -200,6 +245,7 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
         if process.returncode != 0:
             sys.stderr.write(err)
             sys.exit()
+        print 'Splitting regpos into 1bp chunks'
         with open(regpos_file, 'w') as outfile:
             for line in out.split('\n'):
                 ll = line.split()
@@ -229,13 +275,14 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
     
     # create variant density file
     
-    dens_file = bam_file[:-3] + 'ann.vcf.dens.txt'
+    dens_file = bam_file[:-3] + 'hc.reg.ann.dens.txt'
     if not os.path.isfile(dens_file):
         
-        # parse variant count csv
-        
-        var_count = dict()
-        with open(bam_file[:-3]+'ann.vcf.csv') as infile:
+        # parse variant count csvs
+        # region variants
+        var_count = {'TOTAL':0,'DOWNSTREAM':0,'EXON':0,'INTERGENIC':0,'INTRON':0,
+                    'SPLICE_SITE_REGION':0,'UPSTREAM':0,'UTR_3_PRIME':0,'UTR_5_PRIME':0}
+        with open(bam_file[:-3]+'hc.reg.ann.vcf.csv') as infile:
             i = 0
             for line in infile:
                 if i == 1:
@@ -246,6 +293,24 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
                         var_count[ll[0]] = int(ll[1])
                 elif line.startswith('# Count by genomic region'):
                     i = 1
+                elif line.startswith('Number_of_variants_processed'):
+                    var_count['TOTAL'] = int(line.split(' , ')[1])
+        # region het variants
+        varhz_count = {'TOTAL':0,'DOWNSTREAM':0,'EXON':0,'INTERGENIC':0,'INTRON':0,
+                    'SPLICE_SITE_REGION':0,'UPSTREAM':0,'UTR_3_PRIME':0,'UTR_5_PRIME':0}
+        with open(bam_file[:-3]+'hc.reghz.ann.vcf.csv') as infile:
+            i = 0
+            for line in infile:
+                if i == 1:
+                    if line.startswith('#'):
+                        break
+                    ll = line.split(' , ')
+                    if len(ll) == 3 and ll[0] != 'Type': # parse non-empty lines and skip header
+                        varhz_count[ll[0]] = int(ll[1])
+                elif line.startswith('# Count by genomic region'):
+                    i = 1
+                elif line.startswith('Number_of_variants_processed'):
+                    varhz_count['TOTAL'] = int(line.split(' , ')[1])
         
         # parse base count file to obtain matching gene features
         # this step is based on the assupmtion that overlapping variant types coinside with overlapping gene annotations
@@ -260,20 +325,29 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
                     bp_count['UTR_3_PRIME'] = int(ll[1])
                 elif ll[0] == 'Utr5prime':
                     bp_count['UTR_5_PRIME'] = int(ll[1])
+                elif ll[0] == 'Chromosome':
+                    bp_count['TOTAL'] = int(ll[1])
                 elif ll[0].startswith('SpliceSite'): # Donor, Acceptor and Region
                     bp_count['SPLICE_SITE_REGION'] += int(ll[1])
 
-        # calculate density
+        # calculate densities
         
         with open(dens_file, 'w') as out:
+            out.write( '#Feature\tbp_covered\tvariants\tbp/var\tvariants_hz\tbp/var_hz\n' )
             print dens_file + ' variant density file writing.'
-            features = bp_count.keys()
-            features.sort()
+            features = ['TOTAL','DOWNSTREAM','EXON','INTERGENIC','INTRON',
+                        'SPLICE_SITE_REGION','UPSTREAM','UTR_3_PRIME','UTR_5_PRIME']
             for f in features:
-                if f in var_count.keys():
-                    out.write( '%s\t%d\n' % (f,bp_count[f]/var_count[f]) ) # int rounding ok?
-                else: # no variants in feature
-                    out.write( '%s\tNA\n' % (f) )
+                if var_count[f] > 0: # variants in region 
+                    if varhz_count[f] > 0: # heterozygous variants in region 
+                        out.write( '%s\t%d\t%d\t%d\t%d\t%d\n' % (f,bp_count[f],var_count[f],bp_count[f]/var_count[f],varhz_count[f],bp_count[f]/varhz_count[f]) ) # note int rounding for density calculation
+                    else: # no heterozygous variants in feature
+                        out.write( '%s\t%d\t%d\t%d\t0\tNA\n' % (f,bp_count[f],var_count[f],bp_count[f]/var_count[f]) ) # note int rounding for density calculation
+                elif f in bp_count.keys(): # no variants in feature
+                    out.write( '%s\t%d\t0\tNA\t0\tNA\n' % (f,bp_count[f]) )
+                else: # no feature in reads for positions
+                    out.write( '%s\t0\t0\tNA\t0\tNA\n' % (f) )
+                
              
         # clean up
         #print 'rm ' + regpos_file
