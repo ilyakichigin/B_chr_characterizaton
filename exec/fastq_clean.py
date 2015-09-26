@@ -64,11 +64,11 @@ def main(args):
         if args.ampl == 'dop':
             cutadapt_opts = ' -a AGATCGGAAGAGC -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -n 3'
         elif args.ampl == 'wga':
-            cutadapt_opts = ' -a AGATCGGAAGAGC -a TTGTGTTGGGTGTGTTTGG -g CCAAACACACCCAACACAA -n 3'
+            cutadapt_opts = ' -a AGATCGGAAGAGC -g TTGTGTTGGGTGTGTTTGG -a CCAAACACACCCAACACAA -n 3'
         elif args.ampl == 'none':
             cutadapt_opts = ' -a AGATCGGAAGAGC'
         else:
-             raise Exception('Unknown amplification protocol. Known ones - dop, wga')
+             raise Exception('Unknown amplification protocol. Known ones - dop, wga, none')
         command_list = [
                 (args.path_to_cutadapt + cutadapt_opts + ' -o ' + f_ca_fq_name + ' ' + forward_rn_fq),
                 (args.path_to_cutadapt + cutadapt_opts + ' -o ' + r_ca_fq_name + ' ' + reverse_rn_fq),
