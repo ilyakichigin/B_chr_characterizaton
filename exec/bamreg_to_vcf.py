@@ -233,11 +233,19 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
 
     print '-----calc-annot-stats'
 
+    # input
+    pos_file = bam_file[:-3] + 'pos.bed'
+    # outputs
+    regpos_file = reg_file[:-3] + 'regpos.bed'
+    count_file = reg_file[:-3] + 'regpos.count'
+    dens_file = bam_file[:-3] + 'hc.reg.ann.dens.txt'
+
     # create bed with positions inside target regions divided into 1bp chunks
 
-    pos_file = bam_file[:-3] + 'pos.bed'
-    regpos_file = bam_file[:-3] + 'regpos.bed'
     if not os.path.isfile(regpos_file):
+        for wrong_file in (count_file, dens_file):
+            if os.path.isfile(wrong_file):
+                 os.remove(wrong_file)
         bi_command = ['bedtools','intersect', '-a', pos_file, '-b', reg_file]
         print ' '.join(bi_command) + ' > ' + regpos_file + ' # Splitting into 1bp chunks'
         process = subprocess.Popen(bi_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -260,8 +268,9 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
 
     # create regpos count file
 
-    count_file = bam_file[:-3] + 'regpos.count'
     if not os.path.isfile(count_file + '.txt'):
+        if os.path.isfile(dens_file):
+            os.remove(dens_file)
         count_command = ['java','-Xmx1g','-jar',path_to_snpEff,'count',
                           '-n',count_file, genome_snpEff, regpos_file]
         print ' '.join(count_command)
@@ -274,8 +283,7 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
         print count_file + ' feature count files for positions inside target regions exists. OK!'
     
     # create variant density file
-    
-    dens_file = bam_file[:-3] + 'hc.reg.ann.dens.txt'
+
     if not os.path.isfile(dens_file):
         
         # parse variant count csvs
@@ -357,6 +365,21 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
 
     print '-----'
 
+'''
+def genes_in_reg(bam_file,reg_file):
+    
+    # based on previously created files, add gene names and Ensmebl IDs to region BED file.
+
+    # extract Ensembl IDs from regpos count file
+    reg_gene_ids = []
+    with open(count_file + '.txt') as f:
+        next(f) # skip header
+        for line in f:
+            gene_id = line.split()[3].split(;)[1]
+            print gene_id
+            sys.exit()
+'''
+
 def main(config_file):
     
     parser = ConfigParser.ConfigParser()
@@ -368,6 +391,7 @@ def main(config_file):
     select_region_variants(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
                            parser.get('VC','path_to_gatk'), parser.get('VC','genome_fa'), stats=True) 
         
+    # annotate only if path to snpEff is given in conf
     if parser.get('VA','path_to_snpEff'):
         annotate_region_variants(parser.get('VC','bam_file'),
                                  parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
