@@ -60,8 +60,8 @@ if __name__ == '__main__':
     #dry_run = args.dry_run
     # !need to add executables check!
     # Step 1. fastq_clean if trimmed read fastq do not exists
-    f_trim_fq = conf['sample']+'.F.ca.fastq'
-    r_trim_fq = conf['sample']+'.R.ca.fastq'
+    f_trim_fq = conf['sample']+'.ca.R1.fastq'
+    r_trim_fq = conf['sample']+'.ca.R2.fastq'
     if not os.path.isfile(f_trim_fq) and not os.path.isfile(r_trim_fq):
         fc_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
                                      sample_name=conf['sample'],path_to_cutadapt='cutadapt',
@@ -85,7 +85,7 @@ if __name__ == '__main__':
         # Step 2. Perform fastq_to_bam if resulting sam files do not exist.
         target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
         contam_sam_file = '.'.join([conf['sample'],contam_name,'sam'])
-        fb_args = argparse.Namespace(sample_name=conf['sample'], 
+        fb_args = argparse.Namespace(sample=conf['sample'], 
                                      target_genome=conf["target_genome"], contam_genome=conf["contam_genome"], 
                                      path_to_bowtie2='bowtie2', bowtie2_args=conf["bowtie2_args"][1:-1])
         sys.stderr.write('----fastq_to_bam.py----\n')
@@ -147,12 +147,12 @@ if __name__ == '__main__':
         run_script(rd_command)
         sys.stderr.write('----Complete!----\n')
     # Step 6. Calculate sample stats if these do not exist. Less detailed than control_stats.
-    stat_file = conf['sample'] + '.stat.txt'
+    stat_file = conf['sample'] + '.stats.txt'
     if not os.path.isfile(stat_file):
         ss_args = argparse.Namespace(sample=conf['sample'],
                                     F_reads=conf['fastq_F_file'], R_reads=conf['fastq_R_file'],
                                     t_genome=target_name, c_genome=contam_name)
-        sys.stderr.write('----sample_stats.py----\n')        
+        sys.stderr.write('----sample_stats.py----\n')
         try:
             sample_stats.main(ss_args)
         except:

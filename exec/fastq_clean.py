@@ -12,9 +12,9 @@ def parse_command_line_arguments():
                     """
                     Removes primers and Illumina adapter, prints out programs used to stdout. 
                     Required program: cutadapt (tested on v.1.6)
-                    1) Change read names to include '1' for forward and '2' for reverse read (Illumina-specific).
-                    2) Cut Illumina adapters and DOP or WGA primers.
-                    3) Perform paired end mapping to reference and contamination genomes.
+                    1) Rename reads to include '/1' for forward and '/2' for reverse read (for cutadapt).
+                    2) Trim Illumina TruSeq adapters, as well as DOP or WGA primers. Write log.
+                    Output files: sample.ca.R1.fastq, sample.ca.R2.fastq, sample.ca.log
                     """
                     )
     parser.add_argument("fastq_F_file", help="fastq file with forward reads (.fastq)")
@@ -41,7 +41,7 @@ def rename_reads(in_file_name):
             for line in in_file:
                 line_list = line.split(' ')
                 if line.startswith('@') and len(line_list) > 1:
-                    out_line = line_list[0] + line_list[1] # remove separating space
+                    out_line = line_list[0] + '/' + line_list[1][0] + '\n' # leave \1 for F and \2 for R
                 else:
                     out_line = line
                 out_file.write(out_line)
@@ -52,34 +52,43 @@ def main(args):
     
     assert args.fastq_F_file.endswith('.fastq') and args.fastq_R_file.endswith('.fastq') # do not accept gzipped and improperly named files
     # assign output filenames
-    f_ca_fq_name = args.sample_name + '.F.ca.fastq'
-    r_ca_fq_name = args.sample_name + '.R.ca.fastq'
+    f_ca_fq = args.sample_name + '.ca.R1.fastq'
+    r_ca_fq = args.sample_name + '.ca.R2.fastq'
+    log_file = args.sample_name + '.ca.log'
 
     # rename and cutadapt if not already done
-    if (not os.path.isfile(f_ca_fq_name) and not os.path.isfile(r_ca_fq_name)):    
+    if (not os.path.isfile(f_ca_fq) and not os.path.isfile(r_ca_fq)):    
         # rename reads
-        forward_rn_fq = rename_reads(args.fastq_F_file) # Filename returned. rn = renamed
-        reverse_rn_fq = rename_reads(args.fastq_R_file)
-        # remove Illumina unversal adapter and primers depending on the protocol
+        f_rn_fq = rename_reads(args.fastq_F_file) # Filename returned. rn = renamed
+        r_rn_fq = rename_reads(args.fastq_R_file)
+        # common options: remove Illumna TruSeq adapters, trim terminal Ns and set minimum read length to bowtie2 seed length
+        cutadapt_opts = args.path_to_cutadapt + ' -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC \
+                                                -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT \
+                                                --trim-n --minimum-length 20'
+        # remove primers from both ends of reads depending on the protocol
         if args.ampl == 'dop':
-            cutadapt_opts = ' -a AGATCGGAAGAGC -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -n 3'
+            cutadapt_opts += ' -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG \
+                               -A CCACATNNNNNNCTCGAGTCGG -G CCGACTCGAGNNNNNNATGTGG -n 3'
         elif args.ampl == 'wga':
-            cutadapt_opts = ' -a AGATCGGAAGAGC -g TTGTGTTGGGTGTGTTTGG -a CCAAACACACCCAACACAA -n 3'
+            # increase error tolerance as wga primer is variable for unknown reason 
+            cutadapt_opts += ' -a CCAAACACACCCAACACAA -g TTGTGTTGGGTGTGTTTGG \
+                               -A CCAAACACACCCAACACAA -G TTGTGTTGGGTGTGTTTGG -n 3 -e 0.3'
         elif args.ampl == 'none':
-            cutadapt_opts = ' -a AGATCGGAAGAGC'
+            cutadapt_opts += ' '
         else:
              raise Exception('Unknown amplification protocol. Known ones - dop, wga, none')
-        command_list = [
-                (args.path_to_cutadapt + cutadapt_opts + ' -o ' + f_ca_fq_name + ' ' + forward_rn_fq),
-                (args.path_to_cutadapt + cutadapt_opts + ' -o ' + r_ca_fq_name + ' ' + reverse_rn_fq),
-                ('rm ' + forward_rn_fq + ' ' + reverse_rn_fq)]
-        for command in command_list:
-            sys.stderr.write(command+'\n') 
-            process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
+        # inputs and outputs. Note that reads left unpaired after trimming are discarded.
+        cutadapt_opts += ' -o %s -p %s %s %s' % (f_ca_fq,r_ca_fq,f_rn_fq,r_rn_fq)
+        with open(log_file, 'w') as log:
+            sys.stderr.write(cutadapt_opts+'\n') 
+            process = subprocess.Popen(cutadapt_opts.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
             (out, err) = process.communicate()
-            sys.stdout.write(out)
+            log.write(out)
+            sys.stderr.write(err)
+        sys.stderr.write('rm %s %s\n' % (f_rn_fq,r_rn_fq))
+        os.remove(f_rn_fq)
+        os.remove(r_rn_fq)
     else:
-        command_list = []
         print 'Files with removed adapters exist. OK!'
 
 
