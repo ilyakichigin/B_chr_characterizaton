@@ -15,7 +15,7 @@ def parse_command_line_arguments():
                     """
                     )
 
-    parser.add_argument("sample_name", help="sample name - prefix of input files processed with cutadapt")
+    parser.add_argument("sample", help="sample name - prefix of input files processed with cutadapt")
 
     parser.add_argument("-t", "--target_genome", help="base name of reference genome bowtie2 index (e.g. canFam3, bosTau7)")
 
@@ -27,37 +27,47 @@ def parse_command_line_arguments():
 
     return parser.parse_args()
 
+def run_bt2(command, log_file):
+    
+    # run command logging to a file
+    sys.stderr.write(command+'\n') 
+    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
+    (out, err) = process.communicate()
+    with open(log_file, 'w') as log:
+        log.write(out)
+    # ignore bowtie2 warnings for too short reads. All sterr is stored in memory!         
+    #for line in err.splitlines(True):
+    #    if ('Warning: skipping mate' not in line) and ('Warning: minimum score function' not in line):
+    #        
+    sys.stderr.write(err)
+    if process.returncode != 0:
+        sys.exit()
+
 def main(args):    
 
     # assign input filenames
-    f_ca_fq_name = args.sample_name + '.F.ca.fastq'
-    r_ca_fq_name = args.sample_name + '.R.ca.fastq'
+    f_ca_fq = args.sample + '.ca.R1.fastq'
+    r_ca_fq = args.sample + '.ca.R2.fastq'
     # assign output filenames
-    target_name = args.target_genome.split('/')[-1]
-    contam_name = args.contam_genome.split('/')[-1]
-    target_sam_name = args.sample_name + '.' + target_name + '.sam' # simplified name: sample.genome.sam. 'ca' and 'pe not included
-    contam_sam_name = args.sample_name + '.' + contam_name + '.sam'
+    target = args.target_genome.split('/')[-1]
+    contam = args.contam_genome.split('/')[-1]
+    target_sam = args.sample + '.' + target + '.sam' # simplified name: sample.genome.sam. 'ca' and 'pe not included
+    contam_sam = args.sample + '.' + contam + '.sam'
     
     # alignment to genomes - if not already done
-    command_list = []
-    if (not os.path.isfile(target_sam_name)) or (os.path.getsize(target_sam_name) == 0):
-        command_list.append(args.path_to_bowtie2 + ' ' + args.bowtie2_args + ' -x ' + args.target_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + target_sam_name)
+    command_base = args.path_to_bowtie2 + ' ' + args.bowtie2_args + ' -1 ' + f_ca_fq + ' -2 ' + r_ca_fq 
+    if (not os.path.isfile(target_sam)) or (os.path.getsize(target_sam) == 0):
+        command = command_base + ' -x %s -S %s' % (args.target_genome, target_sam)
+        log_file = target_sam[:-3]+'bt2.log'
+        run_bt2(command, log_file)
     else:
         print 'Alignment to target genome exists. OK!'
-    if (not os.path.isfile(contam_sam_name)) or (os.path.getsize(contam_sam_name) == 0):
-        command_list.append(args.path_to_bowtie2 + ' ' + args.bowtie2_args + ' -x ' + args.contam_genome + ' -1 ' + f_ca_fq_name + ' -2 ' + r_ca_fq_name + ' -S ' + contam_sam_name)
+    if (not os.path.isfile(contam_sam)) or (os.path.getsize(contam_sam) == 0):
+        command = command_base + ' -x %s -S %s' % (args.contam_genome, contam_sam)
+        log_file = contam_sam[:-3]+'bt2.log'
+        run_bt2(command, log_file)
     else:
         print 'Alignment to contamination genome exists. OK!'
-    # run
-    for command in command_list:
-        sys.stderr.write(command+'\n') 
-        process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
-        (out, err) = process.communicate()
-        sys.stdout.write(out)
-        # ignore bowtie2 warnings for too short reads. All sterr is stored in memory!         
-        for line in err.splitlines(True):
-            if ('Warning: skipping mate' not in line) and ('Warning: minimum score function' not in line):
-                sys.stderr.write(line)
 
 if __name__ == '__main__':
     main(parse_command_line_arguments())

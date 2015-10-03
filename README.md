@@ -11,7 +11,7 @@ Currently, two pipelines are implemented:
 
 Dependancies:
 
-1. cutadapt (tested on v.1.6)
+1. cutadapt (tested on v.1.8.3)
 
 2. bowtie2 (tested on v.2.1.0, 2.2.4)
 
