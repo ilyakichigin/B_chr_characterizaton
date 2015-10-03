@@ -365,20 +365,86 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
 
     print '-----'
 
-'''
+
 def genes_in_reg(bam_file,reg_file):
     
     # based on previously created files, add gene names and Ensmebl IDs to region BED file.
+    
+    print '-----genes_in_reg'
+    genereg_file = reg_file[:-3] + 'genes.bed'
+    if not os.path.isfile(genereg_file):
+        # regions to dict
+        regs = []
+        with open(reg_file) as f:
+            for line in f:
+                ll = line.split()
+                if len(ll) > 0:
+                    assert len(ll) == 3 # Region file is clean BED
+                    line = '\t'.join(ll) + '\n' # tab-delimited BED from space-delimited BED
+                    regs.append(line)
 
-    # extract Ensembl IDs from regpos count file
-    reg_gene_ids = []
-    with open(count_file + '.txt') as f:
-        next(f) # skip header
-        for line in f:
-            gene_id = line.split()[3].split(;)[1]
-            print gene_id
-            sys.exit()
-'''
+        # extract Ensembl gene IDs from regpos count file 
+        gene_ids = []
+        with open(reg_file[:-3] + 'regpos.count.txt') as f:
+            next(f) # skip header
+            for line in f:
+                ll = line.split()
+                if len(ll) == 6:
+                    if ll[3].split(';')[0] == 'Gene':
+                        gene_id = ll[3].split(';')[1]
+                        chrom = 'chr'+ll[0]
+                        start = ll[1]
+                        end = ll[2]
+                        gene_ids.append('\t'.join([chrom,start,end,gene_id]))
+                        # match gene coordinates with region
+
+        # match gene ids with individual regions based on genomic coordinates.
+        gene_bed_file = 'tmp.ensGene.bed'
+        with open(gene_bed_file, 'w') as f:
+            f.write('\n'.join(gene_ids))
+        regs_ensGene = dict()
+        reg_bed_file = 'tmp.reg.bed'
+        for reg in regs:
+            with open(reg_bed_file, 'w') as f:
+                f.write(reg)
+            bi_command = ['bedtools','intersect', '-a', gene_bed_file, '-b', reg_bed_file]
+            #print ' '.join(bi_command) 
+            process = subprocess.Popen(bi_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            (out, err) = process.communicate()
+            if process.returncode != 0:
+                sys.stderr.write(err)
+                sys.exit()
+            reg_eg = [line.split()[3] for line in out.split('\n')[:-1]]
+            regs_ensGene[reg] = reg_eg
+            os.remove(reg_bed_file)
+        os.remove(gene_bed_file)
+            
+        # match conventional gene names with Ensembl gene IDs
+        gene_names = dict()
+        with open(bam_file[:-3] + 'hc.reg.ann.vcf.genes.txt') as f:
+            for line in f:
+                ll = line.split()
+                gene_names[ll[1]] = ll[0]
+
+        # get gene names from Ensembl IDs for individual regions and write to file
+        with open(genereg_file, 'w') as out:
+            
+            print 'Adding genes region BED %s. Writing to %s.' % (reg_file,genereg_file)
+            for reg in regs:
+                ensGenes = regs_ensGene[reg]
+                namedGenes = []
+                for ensGene in ensGenes:
+                    if ensGene in gene_names.keys():
+                       namedGenes.append(gene_names[ensGene])
+                    else:
+                        namedGenes.append(ensGene)
+                out.write( '\t'.join([reg.strip('\n'), ';'.join(ensGenes), ';'.join(namedGenes)]) + '\n' )
+    
+    else:
+         print genereg_file + ' region BED file with genes added exists. OK!'
+
+    print '-----'
+
 
 def main(config_file):
     
@@ -397,6 +463,7 @@ def main(config_file):
                                  parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
         calc_annot_stats(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
                          parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
+        genes_in_reg(parser.get('VC','bam_file'), parser.get('VC','reg_bed'))
 
 if __name__ == '__main__':
     main(sys.argv[1])
