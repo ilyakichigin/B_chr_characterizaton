@@ -22,17 +22,20 @@ def parse_command_line_arguments():
     return parser.parse_args()
 
 def fastq_stats(fastq_name):
+
     i = 0
     readlen = 0
+
     with open(fastq_name) as f:
         for line in f:
             i += 1
             if i%4 == 2:
                 readlen += len(line.strip('\n'))
 
-        return [i/4, readlen]
+    return [i/4, readlen]
 
 def bam_stats(filename):
+
     # from https://www.biostars.org/p/1890/ - number of mapped reads
     return reduce(lambda x, y: x + y, [ int(l.rstrip('\n').split('\t')[2]) for l in pysam.idxstats(filename) ])
 
@@ -41,12 +44,13 @@ def main(args):
     stats = [args.sample, 0, 0, 0, 0]
     # init fastq stats
     for fname in (args.F_reads, args.R_reads):
+        
         fstat = fastq_stats(fname)
         stats[1] += fstat[0] # reads
         stats[2] += fstat[1] # bp
     # cutadapt fastq stats
-    for direction in ('F','R'):
-        fname = '.'.join([args.sample,direction,'ca','fastq'])
+    for direction in ('R1','R2'):
+        fname = '.'.join([args.sample,'ca',direction,'fastq'])
         fstat = fastq_stats(fname)
         stats[3] += fstat[0] # reads
         stats[4] += fstat[1] # bp

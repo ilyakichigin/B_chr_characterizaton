@@ -34,13 +34,13 @@ def run_bt2(command, log_file):
     process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
     (out, err) = process.communicate()
     with open(log_file, 'w') as log:
-        log.write(out)
+        log.write(err)
     # ignore bowtie2 warnings for too short reads. All sterr is stored in memory!         
     #for line in err.splitlines(True):
     #    if ('Warning: skipping mate' not in line) and ('Warning: minimum score function' not in line):
     #        
-    sys.stderr.write(err)
     if process.returncode != 0:
+        print "Something went wrong. Check %s for details." % (log_file)
         sys.exit()
 
 def main(args):    

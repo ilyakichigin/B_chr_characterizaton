@@ -21,9 +21,9 @@ def fastq_to_re_fasta(args):
 
     # From two fastq files generate interleaved fasta file with added '/1' for forward and '/2' for reverse read
     
-    f_fastq = args.cutadapt_prefix + '.F.ca.fastq'
-    r_fastq = args.cutadapt_prefix + '.R.ca.fastq'
-    o_fasta = args.cutadapt_prefix + '.re.fasta'
+    f_fastq = args.cutadapt_prefix + '.ca.R1.fastq'
+    r_fastq = args.cutadapt_prefix + '.ca.R2.fastq'
+    o_fasta = args.cutadapt_prefix + '.ca.re.fasta'
     rename = args.rename
     
     min_read_length = 18 # minimum read length defined as word length in megablast at cluster annotation
