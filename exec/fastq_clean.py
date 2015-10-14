@@ -10,11 +10,11 @@ def parse_command_line_arguments():
 
     parser = argparse.ArgumentParser(description=    
                     """
-                    Removes primers and Illumina adapter, prints out programs used to stdout. 
-                    Required program: cutadapt (tested on v.1.6)
+                    Removes primers and Illumina adapter in PE mode, prints out programs used to stdout. 
+                    Required program: cutadapt (tested on v.1.8)
                     1) Rename reads to include '/1' for forward and '/2' for reverse read (for cutadapt).
                     2) Trim Illumina TruSeq adapters, as well as DOP or WGA primers. Write log.
-                    Output files: sample.ca.R1.fastq, sample.ca.R2.fastq, sample.ca.log
+                    Output files: sample.ca.R1.fastq, sample.ca.R2.fastq, sample.ca.log. 
                     """
                     )
     parser.add_argument("fastq_F_file", help="fastq file with forward reads (.fastq)")
@@ -26,6 +26,8 @@ def parse_command_line_arguments():
     parser.add_argument("--path_to_cutadapt", default="cutadapt", help="path to cutadapt binary")
 
     parser.add_argument("--ampl", default="dop", help="Amplification protocol - used to remove specific primers. Possible values: dop, wga, none")
+
+    parser.add_argument("--params", default="--trim-n --minimum-length 20", help="Additional parameters for cutadapt. Default - trim terminal Ns and discard read pairs with at least one read shorter than 20 (bowtie2 seed length). For WGA it is sometimes useful to increase error toleance with -e")
 
     return parser.parse_args()
    
@@ -61,18 +63,17 @@ def main(args):
         # rename reads
         f_rn_fq = rename_reads(args.fastq_F_file) # Filename returned. rn = renamed
         r_rn_fq = rename_reads(args.fastq_R_file)
-        # common options: remove Illumna TruSeq adapters, trim terminal Ns and set minimum read length to bowtie2 seed length
+        # common options: remove Illumna TruSeq adapters, apply additional parameters.
         cutadapt_opts = args.path_to_cutadapt + ' -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC \
-                                                -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT \
-                                                --trim-n --minimum-length 20'
+                                                -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT ' + \
+                                                args.params.strip("\'\"")
         # remove primers from both ends of reads depending on the protocol
         if args.ampl == 'dop':
             cutadapt_opts += ' -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG \
                                -A CCACATNNNNNNCTCGAGTCGG -G CCGACTCGAGNNNNNNATGTGG -n 3'
         elif args.ampl == 'wga':
-            # increase error tolerance as wga primer is variable for unknown reason 
             cutadapt_opts += ' -a CCAAACACACCCAACACAA -g TTGTGTTGGGTGTGTTTGG \
-                               -A CCAAACACACCCAACACAA -G TTGTGTTGGGTGTGTTTGG -n 3 -e 0.3'
+                               -A CCAAACACACCCAACACAA -G TTGTGTTGGGTGTGTTTGG -n 3'
         elif args.ampl == 'none':
             cutadapt_opts += ' '
         else:
@@ -85,6 +86,8 @@ def main(args):
             (out, err) = process.communicate()
             log.write(out)
             sys.stderr.write(err)
+            if process.returncode != 0:
+                sys.exit()
         sys.stderr.write('rm %s %s\n' % (f_rn_fq,r_rn_fq))
         os.remove(f_rn_fq)
         os.remove(r_rn_fq)
