@@ -4,9 +4,9 @@ DOPseq_analyzer is a a set of tools for processing of Illumina sequencing data o
 
 Currently, three pipelines are implemented: 
 
-1. Analysis of B chromosomes (pipeline/b_dopseq_pipe.py) includes read trimming, alignment to reference genome, contamination filtering, region calling and statistics calculation. It is suitable for reference genomes assembled up to the chromosomes. Details on processing steps and additional routines for repetitive DNA characterization with RepeatExplorer and variant calling are described at the end of the configuration file (pipeline/b_dopseq_pipe.config)
-2. Analysis of anole microchromosomes (anolis/pipeline/anolis_dopseq_pipe.py) includes similar steps. It is optimized for reference genomes consisting of scaffolds and has a possibility to handle WGA libraries.
-3. Variant calling for validated chromosome-specific regions with GATK HaplotypeCaller.
+1. Analysis of B chromosomes (pipeline/b_dopseq_pipe.py) includes read trimming, alignment to reference genome, contamination filtering, region calling and statistics calculation. Details on processing steps and additional routines for repetitive DNA characterization with RepeatExplorer and variant calling are described at the end of the configuration file (pipeline/b_dopseq_pipe.config). Maintained by drevoz.
+2. Analysis of anole microchromosomes (anolis/pipeline/anolis_dopseq_pipe.py) includes similar steps. It is optimized for reference genomes consisting of scaffolds and has a possibility to handle WGA libraries. Maintained by ilyakichigin.
+3. Variant calling for validated chromosome-specific regions with GATK HaplotypeCaller (pipeline/vca_reg.py). Maintained by drevoz.
 
 # Installation and usage
 
@@ -24,4 +24,4 @@ Dependancies:
 
 6. (Optional - for subsequent variant calling and annotation) GATK (tested on v.3.3.0), picard-tools (tested on v.1.125), snpEff (tested on v.3.3.0)
 
-Scripts located into exec folder can be run independenly or as a part of the pipeline. Some of the scripts are not included in the pipelines, as these should use corrected regions as input. For more thorough description, see pipeline config files.
+Scripts located into exec folder can be run independenly or as a part of the pipeline. Some of the scripts are not included in the pipelines, as these should use corrected regions as input or prepare the data for analysis with outside tools. For more thorough description, see pipeline config files.
