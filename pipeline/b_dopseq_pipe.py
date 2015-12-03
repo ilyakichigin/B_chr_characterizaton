@@ -54,34 +54,33 @@ def run_script(command, run=False):
     process.wait()
     if process.returncode != 0: # error raised
         sys.exit()
+
 if __name__ == '__main__':
     args = parse_command_line_arguments()
     conf = parse_config(args.config_file)
     #dry_run = args.dry_run
     # !need to add executables check!
-    # Step 1. fastq_clean if trimmed read fastq do not exists
     f_trim_fq = conf['sample']+'.ca.R1.fastq'
     r_trim_fq = conf['sample']+'.ca.R2.fastq'
-    if not os.path.isfile(f_trim_fq) and not os.path.isfile(r_trim_fq):
-        fc_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
-                                     sample_name=conf['sample'],path_to_cutadapt='cutadapt',
-                                     ampl=conf["ampl"],params=conf["cutadapt_args"])
-        assert os.path.isfile(conf['fastq_F_file'])
-        assert os.path.isfile(conf['fastq_R_file'])
-        sys.stderr.write('----fastq_clean.py----\n')
-        #try:
-        fastq_clean.main(fc_args)
-        #except:
-        #    sys.exit(1)
-        sys.stderr.write('----Complete!----\n')
-        
-    # Steps 2&3. fastq_to_bam and contam_filter if filetered bam does not exist.
     target_name = conf["target_genome"].split('/')[-1]
     contam_name = conf["contam_genome"].split('/')[-1]
     base_name = '.'.join([conf['sample'],target_name,'filter'])
     filtered_bam_file = base_name+'.bam'
-    
-    if not os.path.isfile(filtered_bam_file):    
+    if not os.path.isfile(filtered_bam_file): 
+        if not os.path.isfile(f_trim_fq) and not os.path.isfile(r_trim_fq):
+            # Step 1. fastq_clean if trimmed read fastq do not exists
+            fc_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
+                                         sample_name=conf['sample'],path_to_cutadapt='cutadapt',
+                                         ampl=conf["ampl"],params=conf["cutadapt_args"])
+            assert os.path.isfile(conf['fastq_F_file'])
+            assert os.path.isfile(conf['fastq_R_file'])
+            sys.stderr.write('----fastq_clean.py----\n')
+            #try:
+            fastq_clean.main(fc_args)
+            #except:
+            #    sys.exit(1)
+            sys.stderr.write('----Complete!----\n')
+            
         # Step 2. Perform fastq_to_bam if resulting sam files do not exist.
         target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
         contam_sam_file = '.'.join([conf['sample'],contam_name,'sam'])
