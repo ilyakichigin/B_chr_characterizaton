@@ -3,7 +3,7 @@
 # From bam file create annotated VCF callset for target genomic regions and statistics. See .conf for details.
 # Requires: GATK (tested on v.3.3.0), picard-tools (tested on v.1.125)
 # Requires in $PATH: samtools (in $PATH, tested on v.0.1.19), bedtools
-# Usage: bamreg_to_vcf.py bamreg_to_vcf.conf
+# Usage: vca_reg.py vca_reg.conf
 
 import subprocess
 import sys
