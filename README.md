@@ -24,4 +24,4 @@ Dependancies:
 
 6. (Optional - for subsequent variant calling and annotation) GATK (tested on v.3.3.0), picard-tools (tested on v.1.125), snpEff (tested on v.3.3.0)
 
-Scripts located into exec folder can be run independenly or as a part of the pipeline. Some of the scripts are not included in the pipelines, as these should use corrected regions as input or prepare the data for analysis with outside tools. For more thorough description, see pipeline config files.
+Scripts located into exec folder can be run independenly or as a part of the pipeline. In the latter case, package structure must be preserved in order for pipeline to find exec folder. Some of the scripts are not included in the pipelines, as these should use corrected regions as input or prepare the data for analysis with outside tools. For more thorough description, see pipeline config files.
