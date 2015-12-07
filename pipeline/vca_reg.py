@@ -110,7 +110,8 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
     with open(bed_file) as infile: 
         for line in infile:
             if len(line) > 1: # non-empty lines
-                assert line.startswith('chr'), "Improper chromosome name in bed file:\n%s" % line
+                # this assert does not work for scaffold assemblies
+                #assert line.startswith('chr'), "Improper chromosome name in bed file:\n%s" % line
                 ll = line.split('\t')
                 assert len(ll) == 3, "Incorrect separation or column number in bed file:\n%s" % line
                 assert int(ll[1]) < int(ll[2]), "Start coordinate is larger than the end in bed file:\n%s" % line                 
@@ -392,12 +393,12 @@ def genes_in_reg(bam_file,reg_file):
                 if len(ll) == 6:
                     if ll[3].split(';')[0] == 'Gene':
                         gene_id = ll[3].split(';')[1]
-                        chrom = 'chr'+ll[0]
+                        chrom = ll[0]
                         start = ll[1]
                         end = ll[2]
                         gene_ids.append('\t'.join([chrom,start,end,gene_id]))
                         # match gene coordinates with region
-
+        
         # match gene ids with individual regions based on genomic coordinates.
         gene_bed_file = 'tmp.ensGene.bed'
         with open(gene_bed_file, 'w') as f:
@@ -418,7 +419,7 @@ def genes_in_reg(bam_file,reg_file):
             regs_ensGene[reg] = reg_eg
             os.remove(reg_bed_file)
         os.remove(gene_bed_file)
-            
+
         # match conventional gene names with Ensembl gene IDs
         gene_names = dict()
         with open(bam_file[:-3] + 'hc.reg.ann.vcf.genes.txt') as f:
@@ -429,7 +430,7 @@ def genes_in_reg(bam_file,reg_file):
         # get gene names from Ensembl IDs for individual regions and write to file
         with open(genereg_file, 'w') as out:
             
-            print 'Adding genes region BED %s. Writing to %s.' % (reg_file,genereg_file)
+            print 'Adding genes to region BED %s. Writing to %s.' % (reg_file,genereg_file)
             for reg in regs:
                 ensGenes = regs_ensGene[reg]
                 namedGenes = []
