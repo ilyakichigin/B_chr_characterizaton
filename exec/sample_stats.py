@@ -2,6 +2,7 @@
 
 import argparse
 import pysam
+import gzip
 
 def parse_command_line_arguments():
 
@@ -25,12 +26,20 @@ def fastq_stats(fastq_name):
 
     i = 0
     readlen = 0
+    
+    if fastq_name.endswith('.fastq'):
+        f = open(fastq_name)
+    elif fastq_name.endswith('.fastq.gz'):
+        f = gzip.open(fastq_name)
+    else:
+        print 'Improper read naming:\n%s\n%s' % (args.fastq_F_file, args.fastq_R_file)
+        sys.exit(1)
 
-    with open(fastq_name) as f:
-        for line in f:
-            i += 1
-            if i%4 == 2:
-                readlen += len(line.strip('\n'))
+    for line in f:
+        i += 1
+        if i%4 == 2:
+            readlen += len(line.strip('\n'))
+    f.close()
 
     return [i/4, readlen]
 

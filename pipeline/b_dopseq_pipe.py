@@ -71,7 +71,8 @@ if __name__ == '__main__':
             # Step 1. fastq_clean if trimmed read fastq do not exists
             fc_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
                                          sample_name=conf['sample'],path_to_cutadapt='cutadapt',
-                                         ampl=conf["ampl"],params=conf["cutadapt_args"])
+                                         ampl=conf["ampl"],params=conf["cutadapt_args"],
+                                         delimiter=' ', rename_only=False)
             assert os.path.isfile(conf['fastq_F_file'])
             assert os.path.isfile(conf['fastq_R_file'])
             sys.stderr.write('----fastq_clean.py----\n')
