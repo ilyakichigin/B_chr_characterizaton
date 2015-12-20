@@ -17,9 +17,7 @@ def parse_command_line_arguments():
 
     parser.add_argument("sample", help="sample name - prefix of input files processed with cutadapt")
 
-    parser.add_argument("-t", "--target_genome", help="base name of reference genome bowtie2 index (e.g. canFam3, bosTau7)")
-
-    parser.add_argument("-c", "--contam_genome", default="hg19", help="base name for contamination genome bowtie2 index (default hg19)")
+    parser.add_argument("-t", "--target_genome", help="base name of reference genome bowtie2 index")
 
     parser.add_argument("--path_to_bowtie2", default="bowtie2", help="path to bowtie2 binary")
 
@@ -35,10 +33,6 @@ def run_bt2(command, log_file):
     (out, err) = process.communicate()
     with open(log_file, 'w') as log:
         log.write(err)
-    # ignore bowtie2 warnings for too short reads. All sterr is stored in memory!         
-    #for line in err.splitlines(True):
-    #    if ('Warning: skipping mate' not in line) and ('Warning: minimum score function' not in line):
-    #        
     if process.returncode != 0:
         print "Something went wrong. Check %s for details." % (log_file)
         sys.exit()
@@ -50,11 +44,8 @@ def main(args):
     r_ca_fq = args.sample + '.ca.R2.fastq'
     # assign output filenames
     target = args.target_genome.split('/')[-1]
-    contam = args.contam_genome.split('/')[-1]
-    target_sam = args.sample + '.' + target + '.sam' # simplified name: sample.genome.sam. 'ca' and 'pe not included
-    contam_sam = args.sample + '.' + contam + '.sam'
-    
-    # alignment to genomes - if not already done
+    target_sam = args.sample + '.' + target + '.sam' # simplified name: sample.genome.sam. 'ca' not included
+    # alignment to target - if not already done
     command_base = args.path_to_bowtie2 + ' ' + args.bowtie2_args + ' -1 ' + f_ca_fq + ' -2 ' + r_ca_fq 
     if (not os.path.isfile(target_sam)) or (os.path.getsize(target_sam) == 0):
         command = command_base + ' -x %s -S %s' % (args.target_genome, target_sam)
@@ -62,12 +53,6 @@ def main(args):
         run_bt2(command, log_file)
     else:
         print 'Alignment to target genome exists. OK!'
-    if (not os.path.isfile(contam_sam)) or (os.path.getsize(contam_sam) == 0):
-        command = command_base + ' -x %s -S %s' % (args.contam_genome, contam_sam)
-        log_file = contam_sam[:-3]+'bt2.log'
-        run_bt2(command, log_file)
-    else:
-        print 'Alignment to contamination genome exists. OK!'
 
 if __name__ == '__main__':
     main(parse_command_line_arguments())

@@ -3,6 +3,7 @@
 import subprocess
 import argparse
 import os.path
+import pysam
 
 import sys
 exec_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..","exec"))
@@ -53,7 +54,7 @@ def run_script(command, run=False):
     process = subprocess.Popen(command) 
     process.wait()
     if process.returncode != 0: # error raised
-        sys.exit()
+        sys.exit(1)
 
 if __name__ == '__main__':
     args = parse_command_line_arguments()
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     f_trim_fq = conf['sample']+'.ca.R1.fastq'
     r_trim_fq = conf['sample']+'.ca.R2.fastq'
     target_name = conf["target_genome"].split('/')[-1]
-    contam_name = conf["contam_genome"].split('/')[-1]
+    
     base_name = '.'.join([conf['sample'],target_name,'filter'])
     filtered_bam_file = base_name+'.bam'
     if not os.path.isfile(filtered_bam_file): 
@@ -82,27 +83,33 @@ if __name__ == '__main__':
             #    sys.exit(1)
             sys.stderr.write('----Complete!----\n')
             
-        # Step 2. Perform fastq_to_bam if resulting sam files do not exist.
+        # Step 2. Align to target genome
         target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
-        contam_sam_file = '.'.join([conf['sample'],contam_name,'sam'])
-        fb_args = argparse.Namespace(sample=conf['sample'], 
-                                     target_genome=conf["target_genome"], contam_genome=conf["contam_genome"], 
+        fb_args = argparse.Namespace(sample=conf['sample'], target_genome=conf["target_genome"],
                                      path_to_bowtie2='bowtie2', bowtie2_args=conf["bowtie2_args"][1:-1])
         sys.stderr.write('----fastq_to_bam.py----\n')
-        #try:
         fastq_to_bam.main(fb_args)
-        #except:
-        #    sys.exit(1)
-        sys.stderr.write('----Complete!----\n')
-        # Step 3. contam_filter - remove contamination from the specified genome
-        cf_args = argparse.Namespace(target_file=target_sam_file,contam_file=contam_sam_file,
-                                     min_quality=20)
-        sys.stderr.write('----contam_filter.py----\n')
-        #try:
-        contam_filter.main(cf_args)
-        #except:
-        #    sys.exit(1)
-        sys.stderr.write('----Complete!----\n')
+
+        if "contam_genome" in conf.keys(): 
+            contam_name = conf["contam_genome"].split('/')[-1]
+            contam_sam_file = '.'.join([conf['sample'],contam_name,'sam'])
+            # Step 2a. Align to contamination genome
+            fb2_args = argparse.Namespace(sample=conf['sample'], target_genome=conf["contam_genome"], 
+                                     path_to_bowtie2='bowtie2', bowtie2_args=conf["bowtie2_args"][1:-1])
+            fastq_to_bam.main(fb2_args)
+            sys.stderr.write('----Complete!----\n')
+            # Step 3. contam_filter - remove contamination from the specified genome
+            cf_args = argparse.Namespace(target_file=target_sam_file,contam_file=contam_sam_file,
+                                         min_quality=20)
+            sys.stderr.write('----contam_filter.py----\n')
+            contam_filter.main(cf_args)
+            sys.stderr.write('----Complete!----\n')
+        else:
+            sys.stderr.write('Sorting and indexing %s, resulting file %s\n' % (target_sam_file, filtered_bam_file))
+            pysam.sort(target_sam_file, filtered_bam_file[:-4])
+            pysam.index(filtered_bam_file)
+            #os.remove(target_sam_file)
+            sys.stderr.write('----Complete!----\n')
     # Step 4. Convert bam_to_beds with reads and positions if these files do not exist.
     reads_bed_file = base_name+'.reads.bed'
     pos_bed_file = base_name+'.pos.bed'
@@ -149,9 +156,16 @@ if __name__ == '__main__':
     # Step 6. Calculate sample stats if these do not exist. Less detailed than control_stats.
     stat_file = conf['sample'] + '.stats.txt'
     if not os.path.isfile(stat_file):
-        ss_args = argparse.Namespace(sample=conf['sample'],
-                                    F_reads=conf['fastq_F_file'], R_reads=conf['fastq_R_file'],
-                                    t_genome=target_name, c_genome=contam_name)
+        
+        if "contam_genome" in conf.keys():
+            contam_name = conf["contam_genome"].split('/')[-1]
+            ss_args = argparse.Namespace(sample=conf['sample'],
+                            F_reads=conf['fastq_F_file'], R_reads=conf['fastq_R_file'],
+                            t_genome=target_name,c_genome=contam_name)
+        else:
+            ss_args = argparse.Namespace(sample=conf['sample'],
+                            F_reads=conf['fastq_F_file'], R_reads=conf['fastq_R_file'],
+                            t_genome=target_name,c_genome='')
         sys.stderr.write('----sample_stats.py----\n')
         sample_stats.main(ss_args)
         #try:
