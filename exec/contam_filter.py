@@ -4,7 +4,7 @@ import pysam
 import sys
 import os.path
 import argparse
-
+import subprocess
 
 def parse_command_line_arguments():
 
@@ -13,10 +13,10 @@ def parse_command_line_arguments():
                     Removes contamination reads by comparing MAPQs to target and cotamination genomes.
                     Input: sam/bam alignments to target and contamination genomes.
                     Output: bam alignments: *filter.bam - specific to target, *contam.bam - specific to contamination, *unmap.bam - unmapped to both.   
-                    Pysam python package is required (tested on v.0.8.1)
-                    1) (optional) sort input alignments by read name without cleanup.
+                    Pysam python package and samtools are required (tested on v.0.8.1 and v.0.1.19-44428cd, respectively)
+                    1) Sort input alignments by read name without cleanup.
                     2) Perform contamination analysis.
-                    3) sort and index resulting alignments with cleanup.
+                    3) Sort and index resulting alignments with cleanup.
                     4) Remove input files - all read positions are preserved within three generated files
                     """
                     )
@@ -30,11 +30,15 @@ def parse_command_line_arguments():
 
    
 def sort_by_read_name(filename):
-    sys.stderr.write('Sorting input alignment by read name: %s\n'%(filename))
     srt_name = filename[:-4] + '.ns.bam' # ns for name sorted   
     assert os.path.exists(srt_name) == False # input bam not name sorted yet
-    pysam.sort('-n', filename, srt_name[:-4])
-    sys.stderr.write('Output file: %s\n'%(srt_name))
+    sys.stderr.write('samtools view -bS %s | samtools sort -n - > %s\n'%(filename, srt_name))
+    p1 = subprocess.Popen(('samtools', 'view', '-bS', filename), stdout=subprocess.PIPE)
+    with p1.stdout, open(srt_name, 'w') as outfile:
+        p2 = subprocess.Popen(('samtools', 'sort', '-n', '-', srt_name[:-4]), stdin=p1.stdout, stdout=subprocess.PIPE)
+    status=[p1.wait(),p2.wait()]
+    if p1.returncode != 0 or p1.returncode != 0:
+        sys.exit(1)
     os.remove(filename) # remove unsorted file
     sys.stderr.write('rm %s\n'%(filename))
     return srt_name
@@ -42,10 +46,15 @@ def sort_by_read_name(filename):
 def sort_index(filename):
     srt_name = filename[:-11] + '.bam' # remove 'unsort.bam'  
     if not os.path.exists(srt_name): # output bam not sorted yet
-        sys.stderr.write('Sorting and indexing output alignment: %s\n'%(filename))        
-        pysam.sort(filename, srt_name[:-4])
-        pysam.index(srt_name)
-        sys.stderr.write('Output file: %s\n'%(srt_name))           
+        sys.stderr.write('samtools sort %s %s; samtools index %s \n'%(filename,srt_name[:-4],srt_name))
+        p1 = subprocess.Popen(('samtools', 'sort', filename, srt_name[:-4]), stdout=subprocess.PIPE)
+        status=p1.wait()
+        if p1.returncode != 0:
+            sys.exit(1)
+        p2 = subprocess.Popen(('samtools', 'index', srt_name), stdout=subprocess.PIPE)
+        status=p2.wait()
+        if p2.returncode != 0:
+            sys.exit(1)
         os.remove(filename) # remove unsorted file
         sys.stderr.write('rm %s\n'%(filename))
         return srt_name
@@ -87,8 +96,8 @@ def compare_mapq(tname, cname, min_qual = 20):
 
 def main(args):
     args.min_quality = int(args.min_quality)
-    args.contam_file = sort_by_read_name(args.contam_file)
     args.target_file = sort_by_read_name(args.target_file)
+    args.contam_file = sort_by_read_name(args.contam_file)
     outnames = compare_mapq(args.target_file, args.contam_file, args.min_quality)
     for filename in outnames:
         sort_index(filename)

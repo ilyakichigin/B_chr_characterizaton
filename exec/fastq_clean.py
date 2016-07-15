@@ -11,16 +11,16 @@ def parse_command_line_arguments():
 
     parser = argparse.ArgumentParser(description=    
                     """
-                    Removes primers and Illumina adapter in PE mode, prints out programs used to stdout. 
+                    Removes primers and Illumina adapter in PE mode, prints out programs used to stderr. 
                     Required program: cutadapt (tested on v.1.8)
                     1) Rename reads to include '/1' for forward and '/2' for reverse read (for cutadapt).
                     2) Trim Illumina TruSeq adapters, as well as DOP or WGA primers. Write log.
                     Output files: sample.ca.R1.fastq, sample.ca.R2.fastq, sample.ca.log. 
                     """
                     )
-    parser.add_argument("fastq_F_file", help="fastq file with forward reads (.fastq)")
+    parser.add_argument("fastq_F_file", help="fastq file with forward reads (.fastq or .fastq.gz)")
 
-    parser.add_argument("fastq_R_file", help="fastq file with reverse reads (.fastq)")
+    parser.add_argument("fastq_R_file", help="fastq file with reverse reads (.fastq or .fastq.gz)")
 
     parser.add_argument("--sample_name", help="sample name - used as output prefix")
 
