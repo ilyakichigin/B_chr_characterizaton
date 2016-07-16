@@ -131,7 +131,7 @@ corr_se_matrix <- matrix(corr_start_end, ncol=2, byrow=T)
 out_regions$reg.start <- corr_se_matrix[,1]
 out_regions$reg.end <- corr_se_matrix[,2]
 
-# Calculate additional statistics for each region: number of markers, read coverage mean and sd
+# Calculate additional statistics for each region: number of markers, pd and read coverage mean and sd, pos sizes
 add_stats <- apply(out_regions[,c('chrom','reg.start','reg.end')], 1, function(y) {
   # Subset of positions for each region
   flt_pos_sub <- subset(flt_pos_df, chrom==y['chrom']
