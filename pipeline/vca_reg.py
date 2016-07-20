@@ -510,7 +510,7 @@ def genes_in_reg(bam_file, reg_file):
                     if ll[3].split(';')[0] == 'Gene':
                         gene_id = ll[3].split(';')[1]
                         chrom = ll[0]
-                        if chrom[0].isdigit(): # assume that in reg.bed chromosomes have 'chr' prefix
+                        if chrom[0].isdigit() or chrom == 'X' or chrom == 'Y': # assume that in reg.bed chromosomes have 'chr' prefix
                             chrom = 'chr' + chrom
                         start = ll[1]
                         end = ll[2]
@@ -584,47 +584,50 @@ def reg_calc_annot_stats(bam_file, reg_file, path_to_gatk, path_to_snpEff, genom
     # output
     annot_file = reg_file[:-3] + 'ann.genes.txt'
 
+    if not os.path.isfile(annot_file):
+        with open(genes_file) as f, open(annot_file, 'w') as o:
 
-    with open(genes_file) as f, open(annot_file, 'w') as o:
-
-        tmp_prefix = 'tmp.one.'
-        i = 0
-        header = True
-        o.write('chr\tstart\tend\tensGene\tgene')
-        for line in f: # same output for each line
-            tmp_cleanup(tmp_prefix)
-            i += 1
-            sys.stdout.write('Processing region %s ' % (i))
-            # write one-region BED
-            one_reg_file = tmp_prefix + reg_file
-            with open(one_reg_file, 'w') as of:
-                bed = '\t'.join(line.split()[:3])
-                of.write(bed + '\n')
-            sys.stdout.write('Selecting variants ')
-            sys.stdout.flush()
-            select_region_variants(bam_file, tmp_prefix, one_reg_file, path_to_gatk, genome_fasta, stats=True, verbose=False)
-            sys.stdout.write('Generating regpos ')
-            sys.stdout.flush()
-            generate_regpos_files(bam_file, one_reg_file, genome_fasta, verbose = False)
-            sys.stdout.write('Annotating variants ')
-            sys.stdout.flush()
-            annotate_region_variants(tmp_prefix, path_to_snpEff, genome_snpEff, verbose=False)
-            sys.stdout.write('Calculating stats ')
-            sys.stdout.flush()
-            stats = calc_annot_stats(tmp_prefix, one_reg_file, path_to_snpEff, genome_snpEff, to_file = False)
-            #print stats
-            if header:
+            tmp_prefix = 'tmp.one.'
+            i = 0
+            header = True
+            o.write('chr\tstart\tend\tensGene\tgene')
+            for line in f: # same output for each line
+                tmp_cleanup(tmp_prefix)
+                i += 1
+                sys.stdout.write('Processing region %s ' % (i))
+                # write one-region BED
+                one_reg_file = tmp_prefix + reg_file
+                with open(one_reg_file, 'w') as of:
+                    bed = '\t'.join(line.split()[:3])
+                    of.write(bed + '\n')
+                sys.stdout.write('Selecting variants ')
+                sys.stdout.flush()
+                select_region_variants(bam_file, tmp_prefix, one_reg_file, path_to_gatk, genome_fasta, stats=True, verbose=False)
+                sys.stdout.write('Generating regpos ')
+                sys.stdout.flush()
+                generate_regpos_files(bam_file, one_reg_file, genome_fasta, verbose = False)
+                sys.stdout.write('Annotating variants ')
+                sys.stdout.flush()
+                annotate_region_variants(tmp_prefix, path_to_snpEff, genome_snpEff, verbose=False)
+                sys.stdout.write('Calculating stats ')
+                sys.stdout.flush()
+                stats = calc_annot_stats(tmp_prefix, one_reg_file, path_to_snpEff, genome_snpEff, to_file = False)
+                #print stats
+                if header:
+                    for j in range(len(stats)):
+                        o.write('\t'+stats[j][0])
+                        header = False
+                    o.write('\n')
+                o.write(line[:-1])
                 for j in range(len(stats)):
-                    o.write('\t'+stats[j][0])
-                    header = False
+                    o.write('\t'+str(stats[j][1]))
                 o.write('\n')
-            o.write(line[:-1])
-            for j in range(len(stats)):
-                o.write('\t'+str(stats[j][1]))
-            o.write('\n')
-            sys.stdout.write('\n')
+                sys.stdout.write('\n')
 
-    tmp_cleanup(tmp_prefix)
+        tmp_cleanup(tmp_prefix)
+    else:
+        print annot_file + ' region BED file with genes and per region statistics on variation added exists. OK!'
+
     print '----'
 
 def main(config_file):
