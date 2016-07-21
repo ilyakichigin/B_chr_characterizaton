@@ -15,6 +15,8 @@ def prepare_genome(genome_fasta, path_to_picard):
     # Using picard tools prepare genomic fasta to be used in GATK    
     
     print '-----prepare-genome'
+    assert os.path.isfile(genome_fasta)
+    assert os.path.isfile(path_to_picard)
     dict_file = '.'.join(genome_fasta.split('.')[:-1])+'.dict'
     if not os.path.isfile(dict_file):
         pg_command = ['java','-Xmx1g','-jar',path_to_picard,
@@ -51,6 +53,7 @@ def prepare_bam(bam_file, path_to_picard):
     # Using picard tools prepare BAM file for usage in GATK: add read group and index.
     
     print '-----prepare-bam'
+    assert os.path.isfile(bam_file)
     assert bam_file.endswith('.bam')
     if not os.path.isfile(bam_file[:-1]+'i'):
         sample_name = bam_file.split('.')[0]
@@ -71,7 +74,7 @@ def prepare_bam(bam_file, path_to_picard):
         print 'mv %s %s' % (rg_bam_file[:-1]+'i',bam_file[:-1]+'i')
         os.rename(rg_bam_file[:-1]+'i',bam_file[:-1]+'i') # move index
     else:
-        print 'bam file is prepared for GATK. If it is not, remove associated *bai file and repeat.'     
+        print '.bam file is prepared for GATK. If it is not, remove associated *bai file and repeat.'     
     print '-----'
     
 
@@ -80,7 +83,7 @@ def run_haplotypecaller(bam_file, path_to_gatk, genome_fasta, gatk_mem):
     # run variant calling with GATK HaplotypeCaller
     
     print '-----run-haplotypecaller'
-    assert bam_file.endswith('.bam')
+    assert os.path.isfile(path_to_gatk)
     vcf_file = bam_file[:-3]+'hc.vcf'
     if not os.path.isfile(vcf_file):
         hc_command = ['java','-Xmx'+gatk_mem,'-jar',path_to_gatk,
@@ -100,25 +103,29 @@ def run_haplotypecaller(bam_file, path_to_gatk, genome_fasta, gatk_mem):
         print vcf_file + ' whole-genome vcf file exists. OK!'
     print '-----'
 
-def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats=True):
+def select_region_variants(bam_file, out_prefix, bed_file, path_to_gatk, genome_fasta, stats=True, verbose=True):
     
     # select variants based on BED file with regions
 
-    print '-----select-region-variants'
-    assert bam_file.endswith('.bam')
+    if verbose:
+        print '-----select-region-variants'
+
     # bed sanity check
+    assert os.path.isfile(bed_file)
     with open(bed_file) as infile: 
         for line in infile:
             if len(line) > 1: # non-empty lines
                 # this assert does not work for scaffold assemblies
                 #assert line.startswith('chr'), "Improper chromosome name in bed file:\n%s" % line
-                ll = line.split('\t')
+                ll = line.split('\t') # otherwise, bedtools won't recognize the file
                 assert len(ll) == 3, "Incorrect separation or column number in bed file:\n%s" % line
-                assert int(ll[1]) < int(ll[2]), "Start coordinate is larger than the end in bed file:\n%s" % line                 
+                assert int(ll[1]) < int(ll[2]), "Start coordinate is larger than the end in bed file:\n%s" % line
 
     vcf_file = bam_file[:-3]+'hc.vcf'
-    reg_vcf_file = bam_file[:-3]+'hc.reg.vcf'
-    reghz_vcf_file = bam_file[:-3]+'hc.reghz.vcf'
+    reg_vcf_file = out_prefix+'hc.reg.vcf'
+    reghz_vcf_file = out_prefix+'hc.reghz.vcf'
+    reg_vcf_stat_file = out_prefix+'hc.reg.txt'
+    reghz_vcf_stat_file = out_prefix+'hc.reghz.txt'
 
     # select region variants
     if not os.path.isfile(reg_vcf_file):
@@ -128,7 +135,8 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
                       '--variant',vcf_file,
                       '-L',bed_file,
                       '-o',reg_vcf_file]
-        print ' '.join(sv_command)
+        if verbose:
+            print ' '.join(sv_command)
         process = subprocess.Popen(sv_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (out, err) = process.communicate()
         if process.returncode != 0:
@@ -138,7 +146,6 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
         print reg_vcf_file + ' region vcf file exists. OK!'
 
     # select region heterozygous variants
-
     sample_name = bam_file.split('.')[0]
     if not os.path.isfile(reghz_vcf_file):
         sv_command = ['java','-Xmx1g','-jar',path_to_gatk,
@@ -148,7 +155,8 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
                       '-select','vc.getGenotype(\'%s\').isHet()' % (sample_name),
                       '-L',bed_file,
                       '-o',reghz_vcf_file]
-        print ' '.join(sv_command)
+        if verbose:
+            print ' '.join(sv_command)
         process = subprocess.Popen(sv_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (out, err) = process.communicate()
         if process.returncode != 0:
@@ -156,11 +164,8 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
             sys.exit()
     else:
         print reghz_vcf_file + ' region heterozygous vcf file exists. OK!'
-    
-    # calculate statistics of the resuling region vcfs 
 
-    reg_vcf_stat_file = bam_file[:-4]+'.hc.reg.txt'
-    reghz_vcf_stat_file = bam_file[:-4]+'.hc.reghz.txt'
+    # calculate statistics of the resuling region vcfs 
     for (vcf_file, stat_file) in [(reg_vcf_file,reg_vcf_stat_file),
                                   (reghz_vcf_file,reghz_vcf_stat_file)]:
         if not os.path.isfile(stat_file) and stats:
@@ -177,7 +182,8 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
                           '-EV', 'ValidationReport',
                           '-ST', 'Sample',
                           '-l', 'INFO']
-            print ' '.join(ve_command)
+            if verbose:
+                print ' '.join(ve_command)
             process = subprocess.Popen(ve_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             (out, err) = process.communicate()
             if process.returncode != 0:
@@ -185,12 +191,14 @@ def select_region_variants(bam_file, bed_file, path_to_gatk, genome_fasta, stats
                 sys.exit()
         else:
             print stat_file + ' region variant stat file exists. OK!'
-    print '-----'
+    if verbose:
+        print '-----'
 
-def generate_regpos_files(bam_file, reg_file, genome_fa):
+def generate_regpos_files(bam_file, reg_file, genome_fasta, verbose = True):
 
-    print '-----generate-regpos-files'
-
+    if verbose:
+        print '-----generate-regpos-files'
+    assert os.path.isfile(reg_file)
     # input
     pos_file = bam_file[:-3] + 'pos.bed'
     # outputs
@@ -202,14 +210,15 @@ def generate_regpos_files(bam_file, reg_file, genome_fa):
 
         # get chromosome order from reference
         chr_order = []
-        with open(genome_fa + '.fai') as infile:
+        with open(genome_fasta + '.fai') as infile:
             for line in infile:
                 chr_name = line.split()[0]
                 chr_order.append(chr_name)
         
         # intersect regs and pos
         bi_command = ['bedtools','intersect', '-a', pos_file, '-b', reg_file]
-        print '%s > %s \n%s - splitted into 1bp chunks' % (' '.join(bi_command), regpos_file, regpos_split_file )
+        if verbose:
+            print '%s > %s \n%s - splitted into 1bp chunks' % (' '.join(bi_command), regpos_file, regpos_split_file )
         process = subprocess.Popen(bi_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (out, err) = process.communicate()
         if process.returncode != 0:
@@ -237,16 +246,14 @@ def generate_regpos_files(bam_file, reg_file, genome_fa):
                             start += 1  
     else:
         print regpos_file + ' file with positions inside target regions and its splitted version exist. OK!'
-    
-    print '-----'
+    if verbose:
+        print '-----'
 
-def generate_alt_fasta(bam_file, reg_file, path_to_gatk, genome_fa): 
+def generate_alt_fasta(bam_file, reg_file, path_to_gatk, genome_fasta): 
 
     print '-----generate-alt-fasta'
-
     # inputs
     reg_vcf_file = bam_file[:-3]+'hc.reg.vcf'
-    pos_file = bam_file[:-3] + 'pos.bed'
     regpos_bed = reg_file[:-3] + 'regpos.bed'
     sample_name = bam_file.split('.')[0]
     # output
@@ -257,7 +264,7 @@ def generate_alt_fasta(bam_file, reg_file, path_to_gatk, genome_fa):
         # generate alternate fasta with GATK
         af_command = ['java', '-Xmx1g', '-jar', path_to_gatk,
                       '-T', 'FastaAlternateReferenceMaker',
-                      '-R', genome_fa,
+                      '-R', genome_fasta,
                       '-L', regpos_bed,
                       '-V', reg_vcf_file, 
                       '--use_IUPAC_sample', sample_name]
@@ -285,20 +292,24 @@ def generate_alt_fasta(bam_file, reg_file, path_to_gatk, genome_fa):
         print alt_fasta_file + ' alternate fasta file for positions covered with reads extits. OK!'
     print '-----'
 
-def annotate_region_variants(bam_file, path_to_snpEff, genome_snpEff):
+def annotate_region_variants(prefix, path_to_snpEff, genome_snpEff, verbose=True):
     
-    print '-----annotate-region-variants'
-    
+    if verbose:
+        print '-----annotate-region-variants'
+    assert os.path.isfile(path_to_snpEff) 
+    # input
+    vcf_file = prefix+'hc.reg.vcf'
+    # output
+    ann_vcf_file = prefix+'hc.reg.ann.vcf'
+
     # annotate variants for positions residing inside target regions
-    
-    vcf_file = bam_file[:-3]+'hc.reg.vcf'
-    ann_vcf_file = bam_file[:-3]+'hc.reg.ann.vcf'
     if not os.path.isfile(ann_vcf_file):
-        se_command = ['java','-Xmx1g','-jar',path_to_snpEff,
+        se_command = ['java','-Xmx4g','-jar',path_to_snpEff,
                           '-stats',ann_vcf_file+'.csv', '-csvStats',
                           genome_snpEff, vcf_file]
         with open(ann_vcf_file,'w') as out_vcf:   
-            print ' '.join(se_command)
+            if verbose:
+                print ' '.join(se_command) + ' > ' + ann_vcf_file
             process = subprocess.Popen(se_command, stdout=out_vcf, stderr=subprocess.PIPE)
             (out, err) = process.communicate()
             if process.returncode != 0:
@@ -307,14 +318,19 @@ def annotate_region_variants(bam_file, path_to_snpEff, genome_snpEff):
     else:
         print ann_vcf_file + ' annotated region vcf file exists. OK!'
 
-    vcf_file = bam_file[:-3]+'hc.reghz.vcf'
-    ann_vcf_file = bam_file[:-3]+'hc.reghz.ann.vcf'
+    # input
+    vcf_file = prefix+'hc.reghz.vcf'
+    # output
+    ann_vcf_file = prefix+'hc.reghz.ann.vcf'
+
+    # annotate heterozygous variants for positions residing inside target regions
     if not os.path.isfile(ann_vcf_file):
-        se_command = ['java','-Xmx1g','-jar',path_to_snpEff,
+        se_command = ['java','-Xmx4g','-jar',path_to_snpEff,
                           '-stats',ann_vcf_file+'.csv', '-csvStats',
                           genome_snpEff, vcf_file]
         with open(ann_vcf_file,'w') as out_vcf:   
-            print ' '.join(se_command)
+            if verbose:
+                print ' '.join(se_command) + ' > ' + ann_vcf_file
             process = subprocess.Popen(se_command, stdout=out_vcf, stderr=subprocess.PIPE)
             (out, err) = process.communicate()
             if process.returncode != 0:
@@ -323,44 +339,53 @@ def annotate_region_variants(bam_file, path_to_snpEff, genome_snpEff):
     else:
         print ann_vcf_file + ' annotated heterozygous region vcf file exists. OK!'
     
-    print '-----'
+    if verbose:
+        print '-----'
     
-def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
+def calc_annot_stats(vcf_prefix, reg_file, path_to_snpEff, genome_snpEff, to_file = True):
 
     # calculate statistics of the annotated file
 
-    print '-----calc-annot-stats'
+    if to_file:
+        print '-----calc-annot-stats'
 
-    # input
-    pos_file = bam_file[:-3] + 'pos.bed'
+    # inputs
     regpos_split_file = reg_file[:-3] + 'regpos.split.bed'
+    reg_ann_vcf_csv_file = vcf_prefix + 'hc.reg.ann.vcf.csv'
+    reghz_ann_vcf_csv_file = vcf_prefix + 'hc.reghz.ann.vcf.csv'
     # outputs
-    count_file = reg_file[:-3] + 'regpos.count'
-    dens_file = bam_file[:-3] + 'hc.reg.ann.dens.txt'
+    count_base = reg_file[:-3] + 'regpos.count'
+    count_file = count_base + '.txt'
+    count_summary_file = count_base + '.summary.txt'
+    if to_file:
+        dens_file = vcf_prefix + 'hc.reg.ann.dens.txt'
+    else:
+        dens_file = 'NA' # nonsence name for check pass
 
 
     # create regpos count file
-    if not os.path.isfile(count_file + '.txt'):
+    if not os.path.isfile(count_file):
         if os.path.isfile(dens_file):
             os.remove(dens_file)
-        count_command = ['java','-Xmx1g','-jar',path_to_snpEff,'count',
-                          '-n',count_file, genome_snpEff, regpos_split_file]
-        print ' '.join(count_command)
+        count_command = ['java','-Xmx4g','-jar',path_to_snpEff,'count',
+                          '-n',count_base, genome_snpEff, regpos_split_file]
+        if to_file:
+            print ' '.join(count_command)
         process = subprocess.Popen(count_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (out, err) = process.communicate()
         if process.returncode != 0:
             sys.stderr.write(err)
             sys.exit()
     else:
-        print count_file + '.txt feature count files for positions inside target regions exists. OK!'
+        print count_file + ' feature count files for positions inside target regions exists. OK!'
     
     # create variant density file
     if not os.path.isfile(dens_file):       
-        # parse variant count csvs
+        # parse variant count csv's
         # region variants
         var_count = {'TOTAL':0,'DOWNSTREAM':0,'EXON':0,'INTERGENIC':0,'INTRON':0,
                     'SPLICE_SITE_REGION':0,'UPSTREAM':0,'UTR_3_PRIME':0,'UTR_5_PRIME':0}
-        with open(bam_file[:-3]+'hc.reg.ann.vcf.csv') as infile:
+        with open(reg_ann_vcf_csv_file) as infile:
             i = 0
             for line in infile:
                 if i == 1:
@@ -376,7 +401,7 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
         # region het variants
         varhz_count = {'TOTAL':0,'DOWNSTREAM':0,'EXON':0,'INTERGENIC':0,'INTRON':0,
                     'SPLICE_SITE_REGION':0,'UPSTREAM':0,'UTR_3_PRIME':0,'UTR_5_PRIME':0}
-        with open(bam_file[:-3]+'hc.reghz.ann.vcf.csv') as infile:
+        with open(reghz_ann_vcf_csv_file) as infile:
             i = 0
             for line in infile:
                 if i == 1:
@@ -392,9 +417,9 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
         
         # parse base count file to obtain matching gene features
         # this step is based on the assupmtion that overlapping variant types coinside with overlapping gene annotations
-
-        bp_count = {'SPLICE_SITE_REGION' : 0}
-        with open(count_file+'.summary.txt') as infile:
+        bp_count = {'DOWNSTREAM':0,'EXON':0,'INTERGENIC':0,'INTRON':0,
+                            'SPLICE_SITE_REGION':0,'UPSTREAM':0,'UTR_3_PRIME':0,'UTR_5_PRIME':0}
+        with open(count_summary_file) as infile:
             for line in infile:
                 ll = line.split()
                 if ll[0] in ('Downstream','Exon','Intergenic','Intron','Upstream'):
@@ -409,36 +434,61 @@ def calc_annot_stats(bam_file,reg_file,path_to_snpEff,genome_snpEff):
                     bp_count['SPLICE_SITE_REGION'] += int(ll[1])
 
         # calculate densities
-        
-        with open(dens_file, 'w') as out:
-            out.write( '#Feature\tbp_covered\tvariants\tbp/var\tvariants_hz\tbp/var_hz\n' )
-            print dens_file + ' variant density file writing.'
-            features = ['TOTAL','DOWNSTREAM','EXON','INTERGENIC','INTRON',
-                        'SPLICE_SITE_REGION','UPSTREAM','UTR_3_PRIME','UTR_5_PRIME']
+        if to_file:
+            with open(dens_file, 'w') as out:
+                out.write( '#Feature\tbp_covered\tvariants\tbp/var\tvariants_hz\tbp/var_hz\n' )
+                features = ['TOTAL','DOWNSTREAM','EXON','INTERGENIC','INTRON',
+                            'SPLICE_SITE_REGION','UPSTREAM','UTR_3_PRIME','UTR_5_PRIME']
+                for f in features:
+                    if var_count[f] > 0: # variants in region 
+                        if varhz_count[f] > 0: # heterozygous variants in region 
+                            out.write( '%s\t%d\t%d\t%d\t%d\t%d\n' % (f,bp_count[f],var_count[f],bp_count[f]/var_count[f],varhz_count[f],bp_count[f]/varhz_count[f]) ) # note int rounding for density calculation
+                        else: # no heterozygous variants in feature
+                            out.write( '%s\t%d\t%d\t%d\t0\tNA\n' % (f,bp_count[f],var_count[f],bp_count[f]/var_count[f]) ) # note int rounding for density calculation
+                    elif f in bp_count.keys(): # no variants in feature
+                        out.write( '%s\t%d\t0\tNA\t0\tNA\n' % (f,bp_count[f]) )
+                    else: # no feature in reads for positions
+                        out.write( '%s\t0\t0\tNA\t0\tNA\n' % (f) )
+        else:
+            out = []
+            features = ['TOTAL','INTERGENIC','DOWNSTREAM','UPSTREAM','INTRON','EXON',
+                        'SPLICE_SITE_REGION','UTR_3_PRIME','UTR_5_PRIME']
             for f in features:
+                if f in bp_count.keys():
+                    out.append((f + '_bp',bp_count[f]))
+                else:
+                    out.append((f + '_bp',0))
                 if var_count[f] > 0: # variants in region 
-                    if varhz_count[f] > 0: # heterozygous variants in region 
-                        out.write( '%s\t%d\t%d\t%d\t%d\t%d\n' % (f,bp_count[f],var_count[f],bp_count[f]/var_count[f],varhz_count[f],bp_count[f]/varhz_count[f]) ) # note int rounding for density calculation
-                    else: # no heterozygous variants in feature
-                        out.write( '%s\t%d\t%d\t%d\t0\tNA\n' % (f,bp_count[f],var_count[f],bp_count[f]/var_count[f]) ) # note int rounding for density calculation
-                elif f in bp_count.keys(): # no variants in feature
-                    out.write( '%s\t%d\t0\tNA\t0\tNA\n' % (f,bp_count[f]) )
-                else: # no feature in reads for positions
-                    out.write( '%s\t0\t0\tNA\t0\tNA\n' % (f) )
-                
+                    out.append((f + '_var',var_count[f]))
+                    out.append((f+'_dens',bp_count[f]/var_count[f]))
+                else:
+                    out.append((f + '_var',0))
+                    out.append((f+'_dens','NA'))
+                if varhz_count[f] > 0:
+                    out.append((f + '_varhz',varhz_count[f]))
+                    out.append((f+'_denshz',bp_count[f]/varhz_count[f]))
+                else:
+                    out.append((f + '_varhz',0))
+                    out.append((f+'_denshz','NA'))
+
+            return out
+
     else:
         print dens_file + ' file with variant densities exists. OK!'
+    if(to_file):
+        print '-----'
 
-    print '-----'
-
-
-def genes_in_reg(bam_file,reg_file):
+def genes_in_reg(bam_file, reg_file):
     
     # based on previously created files, add gene names and Ensmebl IDs to region BED file.
     
     print '-----genes_in_reg'
-    genereg_file = reg_file[:-3] + 'genes.bed'
+    #inputs
     regpos_count_file = reg_file[:-3] + 'regpos.count.txt'
+    vcf_genes_file = bam_file[:-3] + 'hc.reg.ann.vcf.genes.txt'
+    #output
+    genereg_file = reg_file[:-3] + 'genes.bed'
+
     if not os.path.isfile(genereg_file):
         # regions to dict
         regs = []
@@ -460,6 +510,8 @@ def genes_in_reg(bam_file,reg_file):
                     if ll[3].split(';')[0] == 'Gene':
                         gene_id = ll[3].split(';')[1]
                         chrom = ll[0]
+                        if chrom[0].isdigit() or chrom == 'X' or chrom == 'Y': # assume that in reg.bed chromosomes have 'chr' prefix
+                            chrom = 'chr' + chrom
                         start = ll[1]
                         end = ll[2]
                         gene_ids.append('\t'.join([chrom,start,end,gene_id]))
@@ -488,7 +540,7 @@ def genes_in_reg(bam_file,reg_file):
 
         # match conventional gene names with Ensembl gene IDs
         gene_names = dict()
-        with open(bam_file[:-3] + 'hc.reg.ann.vcf.genes.txt') as f:
+        with open(vcf_genes_file) as f:
             for line in f:
                 ll = line.split()
                 gene_names[ll[1]] = ll[0]
@@ -499,12 +551,16 @@ def genes_in_reg(bam_file,reg_file):
             print 'Adding genes to region BED %s. Writing to %s.' % (reg_file,genereg_file)
             for reg in regs:
                 ensGenes = regs_ensGene[reg]
-                namedGenes = []
-                for ensGene in ensGenes:
-                    if ensGene in gene_names.keys():
-                       namedGenes.append(gene_names[ensGene])
-                    else:
-                        namedGenes.append(ensGene)
+                if len(ensGenes) > 0:
+                    namedGenes = []
+                    for ensGene in ensGenes:
+                        if ensGene in gene_names.keys():
+                           namedGenes.append(gene_names[ensGene])
+                        else:
+                            namedGenes.append(ensGene)
+                else: 
+                    ensGenes = ['NA']
+                    namedGenes = ['NA']
                 out.write( '\t'.join([reg.strip('\n'), ';'.join(ensGenes), ';'.join(namedGenes)]) + '\n' )
     
     else:
@@ -512,28 +568,93 @@ def genes_in_reg(bam_file,reg_file):
 
     print '-----'
 
+def tmp_cleanup(prefix):
+    filelist = [ file for file in os.listdir(".") if file.startswith(prefix) ]
+    for file in filelist:
+        os.remove(file)
+
+def reg_calc_annot_stats(bam_file, reg_file, path_to_gatk, path_to_snpEff, genome_snpEff, genome_fasta):
+
+    # calculate annotation statistics (as in calc_annot_stats()) independently for each region
+    # add statistics to bed with genes (output of genes_in_reg())
+
+    print '----reg_calc_annot_stats'
+    # input
+    genes_file = reg_file[:-3] + 'genes.bed'
+    # output
+    annot_file = reg_file[:-3] + 'ann.genes.txt'
+
+    if not os.path.isfile(annot_file):
+        with open(genes_file) as f, open(annot_file, 'w') as o:
+
+            tmp_prefix = 'tmp.one.'
+            i = 0
+            header = True
+            o.write('chr\tstart\tend\tensGene\tgene')
+            for line in f: # same output for each line
+                tmp_cleanup(tmp_prefix)
+                i += 1
+                sys.stdout.write('Processing region %s ' % (i))
+                # write one-region BED
+                one_reg_file = tmp_prefix + reg_file
+                with open(one_reg_file, 'w') as of:
+                    bed = '\t'.join(line.split()[:3])
+                    of.write(bed + '\n')
+                sys.stdout.write('Selecting variants ')
+                sys.stdout.flush()
+                select_region_variants(bam_file, tmp_prefix, one_reg_file, path_to_gatk, genome_fasta, stats=True, verbose=False)
+                sys.stdout.write('Generating regpos ')
+                sys.stdout.flush()
+                generate_regpos_files(bam_file, one_reg_file, genome_fasta, verbose = False)
+                sys.stdout.write('Annotating variants ')
+                sys.stdout.flush()
+                annotate_region_variants(tmp_prefix, path_to_snpEff, genome_snpEff, verbose=False)
+                sys.stdout.write('Calculating stats ')
+                sys.stdout.flush()
+                stats = calc_annot_stats(tmp_prefix, one_reg_file, path_to_snpEff, genome_snpEff, to_file = False)
+                #print stats
+                if header:
+                    for j in range(len(stats)):
+                        o.write('\t'+stats[j][0])
+                        header = False
+                    o.write('\n')
+                o.write(line[:-1])
+                for j in range(len(stats)):
+                    o.write('\t'+str(stats[j][1]))
+                o.write('\n')
+                sys.stdout.write('\n')
+
+        tmp_cleanup(tmp_prefix)
+    else:
+        print annot_file + ' region BED file with genes and per region statistics on variation added exists. OK!'
+
+    print '----'
 
 def main(config_file):
     
     parser = ConfigParser.ConfigParser()
     parser.read(config_file)
-    prepare_genome(parser.get('VC','genome_fa'), parser.get('VC','path_to_picard'))
+    prepare_genome(parser.get('VC','genome_fasta'), parser.get('VC','path_to_picard'))
     prepare_bam(parser.get('VC','bam_file'), parser.get('VC','path_to_picard'))
     run_haplotypecaller(parser.get('VC','bam_file'), parser.get('VC','path_to_gatk'),
-                        parser.get('VC','genome_fa'), parser.get('VC','gatk_mem'))
-    select_region_variants(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
-                           parser.get('VC','path_to_gatk'), parser.get('VC','genome_fa'), stats=True)
+                        parser.get('VC','genome_fasta'), parser.get('VC','gatk_mem'))
+    select_region_variants(parser.get('VC','bam_file'), parser.get('VC','bam_file')[:-3], 
+                           parser.get('VC','reg_bed'), parser.get('VC','path_to_gatk'), parser.get('VC','genome_fasta'))
     generate_regpos_files(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
-                          parser.get('VC','genome_fa'))
+                          parser.get('VC','genome_fasta'))
     generate_alt_fasta(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
-                        parser.get('VC','path_to_gatk'), parser.get('VC','genome_fa')) 
+                        parser.get('VC','path_to_gatk'), parser.get('VC','genome_fasta')) 
         
     # annotate only if path to snpEff is given in conf
     if parser.get('VA','path_to_snpEff'):
-        annotate_region_variants(parser.get('VC','bam_file'),
+        annotate_region_variants(parser.get('VC','bam_file')[:-3],
                                  parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
-        calc_annot_stats(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
-                         parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
+        calc_annot_stats(parser.get('VC','bam_file')[:-3], 
+                         parser.get('VC','reg_bed'), parser.get('VA','path_to_snpEff'), 
+                         parser.get('VA','genome_snpEff'))
         genes_in_reg(parser.get('VC','bam_file'), parser.get('VC','reg_bed'))
+        reg_calc_annot_stats(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
+                         parser.get('VC','path_to_gatk'), parser.get('VA','path_to_snpEff'), 
+                         parser.get('VA','genome_snpEff'), parser.get('VC','genome_fasta'))
 if __name__ == '__main__':
     main(sys.argv[1])
