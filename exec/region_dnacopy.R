@@ -95,44 +95,47 @@ out_regions <- segment.CNA.object$output
 names(out_regions)[3] <- "reg.start"
 names(out_regions)[4] <- "reg.end"
 #names(out_regions)[5] <- "positions"
-#names(out_regions)[6] <- "log10.mean"
+names(out_regions)[6] <- "log10.mean"
 # remove unneeded cols: ID, num.mark, seg.mean
-out_regions <- out_regions[,-c(1,5,6)] 
+corr_out_regions <- out_regions[,-c(1,5)] 
 
 # reg.end - change values from beginning to end of position  
-out_regions$reg.end <- apply(out_regions[,c('chrom','reg.end')], 1, function(y) { # ugly look-up
+corr_out_regions$reg.end <- apply(corr_out_regions[,c('chrom','reg.end')], 1, function(y) { # ugly look-up
   flt_pos_df[flt_pos_df$chrom==y['chrom'] & flt_pos_df$start == as.numeric(y['reg.end']),]$end
 })
 
 # Correct for l distance: shift one position to the left, if seg.mean.left>seg.mean.right
 # *check for skipped positions between regions
 corr_start_end <- c()
-for (i in 1:nrow(out_regions)){
+for (i in 1:nrow(corr_out_regions)){
   # start of first position in segment
-  start_index <- which(flt_pos_df$chrom == as.character(out_regions[i,'chrom']) 
-                       & flt_pos_df$start == as.numeric(out_regions[i,'reg.start']))
+  reg_chrom = as.character(corr_out_regions[i,'chrom'])
+  reg_start = as.numeric(corr_out_regions[i,'reg.start'])
+  reg_end = as.numeric(corr_out_regions[i,'reg.end'])
+  reg_log10_mean = corr_out_regions[i,'log10.mean'] # assumed numeric
+  start_index <- which(flt_pos_df$chrom == reg_chrom & flt_pos_df$start == reg_start)
   # end of last position in segment
-  end_index <- which(flt_pos_df$chrom == as.character(out_regions[i,'chrom']) 
-                     & flt_pos_df$end == as.numeric(out_regions[i,'reg.end']))
+  end_index <- which(flt_pos_df$chrom == reg_chrom & flt_pos_df$end == reg_end)
   # correction
-  corr_start <- ifelse(i == 1 || out_regions[i-1,'chrom']!=out_regions[i,'chrom'], # start of chr
-                       flt_pos_df[start_index,'start'],
-                       ifelse(out_regions[i-1,'log10.mean']>out_regions[i,'log10.mean'], # from lower to higher density?
+  corr_start <- ifelse(i == 1 || corr_out_regions[i-1,'chrom']!=reg_chrom, # start of chr
+                       reg_start,
+                       ifelse(corr_out_regions[i-1,'log10.mean']>reg_log10_mean, # from lower to higher density
                               flt_pos_df[start_index-1,'start'], # only case to correct
-                              flt_pos_df[start_index,'start']))
-  corr_end <- ifelse(i == nrow(out_regions) || out_regions[i,'chrom']!=out_regions[i+1,'chrom'], # end of chr
-                     flt_pos_df[end_index,'end'],
-                     ifelse(out_regions[i,'log10.mean']>out_regions[i+1,'log10.mean'], # from lower to higher density?
+                              reg_start))
+  corr_end <- ifelse(i == nrow(corr_out_regions) || reg_chrom!=corr_out_regions[i+1,'chrom'], # end of chr
+                     reg_end,
+                     ifelse(reg_log10_mean>corr_out_regions[i+1,'log10.mean'], # from lower to higher density?
                             flt_pos_df[end_index-1,'end'], # only case to correct
-                            flt_pos_df[end_index,'end']))
+                            reg_end))
   corr_start_end <- c(corr_start_end, corr_start, corr_end)               
 }
 corr_se_matrix <- matrix(corr_start_end, ncol=2, byrow=T)
-out_regions$reg.start <- corr_se_matrix[,1]
-out_regions$reg.end <- corr_se_matrix[,2]
+corr_out_regions$reg.start <- corr_se_matrix[,1]
+corr_out_regions$reg.end <- corr_se_matrix[,2]
+corr_out_regions$reg.size <- corr_out_regions$reg.end - corr_out_regions$reg.start
 
 # Calculate additional statistics for each region: number of markers, pd and read coverage mean and sd, pos sizes
-add_stats <- apply(out_regions[,c('chrom','reg.start','reg.end')], 1, function(y) {
+add_stats <- apply(corr_out_regions[,c('chrom','reg.start','reg.end')], 1, function(y) {
   # Subset of positions for each region
   flt_pos_sub <- subset(flt_pos_df, chrom==y['chrom']
                         & start>=as.numeric(y['reg.start']) 
@@ -149,16 +152,18 @@ add_stats <- apply(out_regions[,c('chrom','reg.start','reg.end')], 1, function(y
            ))
 })
 # add to output
-out_regions$posiions <- add_stats[1,]
-out_regions$pd.mean <- round(add_stats[2,], digits=0)
-out_regions$pd.sd <- round(add_stats[3,], digits=0)
-out_regions$cov.mean <- round(add_stats[4,], digits=2)
-out_regions$cov.sd <- round(add_stats[5,], digits=2)
-out_regions$chrom.size <- add_stats[6,]
-out_regions$pos.bp.mean <- round(add_stats[7,], digits=0)
-out_regions$pos.bp.total <- add_stats[8,]
-out_regions$pos.cov <- out_regions$pos.bp.total/(out_regions$reg.end-out_regions$reg.start)
+corr_out_regions$positions <- add_stats[1,]
+corr_out_regions$pd.mean <- round(add_stats[2,], digits=0)
+corr_out_regions$pd.sd <- round(add_stats[3,], digits=0)
+corr_out_regions$cov.mean <- round(add_stats[4,], digits=2)
+corr_out_regions$cov.sd <- round(add_stats[5,], digits=2)
+corr_out_regions$chrom.size <- add_stats[6,]
+corr_out_regions$pos.bp.mean <- round(add_stats[7,], digits=0)
+corr_out_regions$pos.bp.total <- add_stats[8,]
+corr_out_regions$pos.cov <- corr_out_regions$pos.bp.total/(corr_out_regions$reg.end-corr_out_regions$reg.start)
+corr_out_regions <- corr_out_regions[c('chrom','reg.start','reg.end','reg.size','positions','pd.mean','pd.sd',
+                                       'cov.mean','cov.sd','pos.bp.mean','pos.bp.total','pos.cov','chrom.size','log10.mean')]
 
 # Write tsv file
-write.table(out_regions,file=paste(basename,'.reg.tsv',sep=''),quote=F,sep='\t',
+write.table(corr_out_regions,file=paste(basename,'.reg.tsv',sep=''),quote=F,sep='\t',
             row.names=F,col.names=T)
