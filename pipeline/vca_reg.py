@@ -194,7 +194,7 @@ def select_region_variants(bam_file, out_prefix, bed_file, path_to_gatk, genome_
     if verbose:
         print '-----'
 
-def generate_regpos_files(bam_file, reg_file, genome_fasta, verbose = True):
+def generate_regpos_files(bam_file, reg_file, out_prefix, genome_fasta, verbose = True):
 
     if verbose:
         print '-----generate-regpos-files'
@@ -202,8 +202,8 @@ def generate_regpos_files(bam_file, reg_file, genome_fasta, verbose = True):
     # input
     pos_file = bam_file[:-3] + 'pos.bed'
     # outputs
-    regpos_file = reg_file[:-3] + 'regpos.bed'
-    regpos_split_file = reg_file[:-3] + 'regpos.split.bed'
+    regpos_file = out_prefix + 'regpos.bed'
+    regpos_split_file = out_prefix + 'regpos.split.bed'
 
     # create bed with positions inside target and divide it into 1bp chunks
     if not os.path.isfile(regpos_file) and not os.path.isfile(regpos_split_file):
@@ -249,12 +249,12 @@ def generate_regpos_files(bam_file, reg_file, genome_fasta, verbose = True):
     if verbose:
         print '-----'
 
-def generate_alt_fasta(bam_file, reg_file, path_to_gatk, genome_fasta): 
+def generate_alt_fasta(bam_file, path_to_gatk, genome_fasta): 
 
     print '-----generate-alt-fasta'
     # inputs
     reg_vcf_file = bam_file[:-3]+'hc.reg.vcf'
-    regpos_bed = reg_file[:-3] + 'regpos.bed'
+    regpos_bed = bam_file[:-3] + 'regpos.bed'
     sample_name = bam_file.split('.')[0]
     # output
     alt_fasta_file = bam_file[:-3]+'alt.fa'
@@ -342,7 +342,7 @@ def annotate_region_variants(prefix, path_to_snpEff, genome_snpEff, verbose=True
     if verbose:
         print '-----'
     
-def calc_annot_stats(vcf_prefix, reg_file, path_to_snpEff, genome_snpEff, to_file = True):
+def calc_annot_stats(vcf_prefix, path_to_snpEff, genome_snpEff, to_file = True):
 
     # calculate statistics of the annotated file
 
@@ -350,11 +350,11 @@ def calc_annot_stats(vcf_prefix, reg_file, path_to_snpEff, genome_snpEff, to_fil
         print '-----calc-annot-stats'
 
     # inputs
-    regpos_split_file = reg_file[:-3] + 'regpos.split.bed'
+    regpos_split_file = vcf_prefix + 'regpos.split.bed'
     reg_ann_vcf_csv_file = vcf_prefix + 'hc.reg.ann.vcf.csv'
     reghz_ann_vcf_csv_file = vcf_prefix + 'hc.reghz.ann.vcf.csv'
     # outputs
-    count_base = reg_file[:-3] + 'regpos.count'
+    count_base = vcf_prefix + 'regpos.count'
     count_file = count_base + '.txt'
     count_summary_file = count_base + '.summary.txt'
     if to_file:
@@ -484,10 +484,10 @@ def genes_in_reg(bam_file, reg_file):
     
     print '-----genes_in_reg'
     #inputs
-    regpos_count_file = reg_file[:-3] + 'regpos.count.txt'
+    regpos_count_file = bam_file[:-3] + 'regpos.count.txt'
     vcf_genes_file = bam_file[:-3] + 'hc.reg.ann.vcf.genes.txt'
     #output
-    genereg_file = reg_file[:-3] + 'genes.bed'
+    genereg_file = bam_file[:-3] + 'genes.bed'
 
     if not os.path.isfile(genereg_file):
         # regions to dict
@@ -580,9 +580,9 @@ def reg_calc_annot_stats(bam_file, reg_file, path_to_gatk, path_to_snpEff, genom
 
     print '----reg_calc_annot_stats'
     # input
-    genes_file = reg_file[:-3] + 'genes.bed'
+    genes_file = bam_file[:-3] + 'genes.bed'
     # output
-    annot_file = reg_file[:-3] + 'ann.genes.txt'
+    annot_file = bam_file[:-3] + 'ann.genes.txt'
 
     if not os.path.isfile(annot_file):
         with open(genes_file) as f, open(annot_file, 'w') as o:
@@ -602,16 +602,17 @@ def reg_calc_annot_stats(bam_file, reg_file, path_to_gatk, path_to_snpEff, genom
                     of.write(bed + '\n')
                 sys.stdout.write('Selecting variants ')
                 sys.stdout.flush()
+
                 select_region_variants(bam_file, tmp_prefix, one_reg_file, path_to_gatk, genome_fasta, stats=True, verbose=False)
                 sys.stdout.write('Generating regpos ')
                 sys.stdout.flush()
-                generate_regpos_files(bam_file, one_reg_file, genome_fasta, verbose = False)
+                generate_regpos_files(bam_file, one_reg_file, tmp_prefix, genome_fasta, verbose = False)
                 sys.stdout.write('Annotating variants ')
                 sys.stdout.flush()
                 annotate_region_variants(tmp_prefix, path_to_snpEff, genome_snpEff, verbose=False)
                 sys.stdout.write('Calculating stats ')
                 sys.stdout.flush()
-                stats = calc_annot_stats(tmp_prefix, one_reg_file, path_to_snpEff, genome_snpEff, to_file = False)
+                stats = calc_annot_stats(tmp_prefix, path_to_snpEff, genome_snpEff, to_file = False)
                 #print stats
                 if header:
                     for j in range(len(stats)):
@@ -641,16 +642,15 @@ def main(config_file):
     select_region_variants(parser.get('VC','bam_file'), parser.get('VC','bam_file')[:-3], 
                            parser.get('VC','reg_bed'), parser.get('VC','path_to_gatk'), parser.get('VC','genome_fasta'))
     generate_regpos_files(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
-                          parser.get('VC','genome_fasta'))
-    generate_alt_fasta(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
+                          parser.get('VC','bam_file')[:-3], parser.get('VC','genome_fasta'))
+    generate_alt_fasta(parser.get('VC','bam_file'), 
                         parser.get('VC','path_to_gatk'), parser.get('VC','genome_fasta')) 
         
     # annotate only if path to snpEff is given in conf
     if parser.get('VA','path_to_snpEff'):
         annotate_region_variants(parser.get('VC','bam_file')[:-3],
                                  parser.get('VA','path_to_snpEff'), parser.get('VA','genome_snpEff'))
-        calc_annot_stats(parser.get('VC','bam_file')[:-3], 
-                         parser.get('VC','reg_bed'), parser.get('VA','path_to_snpEff'), 
+        calc_annot_stats(parser.get('VC','bam_file')[:-3], parser.get('VA','path_to_snpEff'), 
                          parser.get('VA','genome_snpEff'))
         genes_in_reg(parser.get('VC','bam_file'), parser.get('VC','reg_bed'))
         reg_calc_annot_stats(parser.get('VC','bam_file'), parser.get('VC','reg_bed'),
