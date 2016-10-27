@@ -10,6 +10,7 @@ exec_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..","exec"))
 sys.path.append(exec_path)
 
 import fastq_clean
+import fastq_clean_se
 import fastq_to_bam
 import contam_filter
 import bam_to_beds
@@ -62,14 +63,17 @@ if __name__ == '__main__':
     #dry_run = args.dry_run
     # !need to add executables check!
     f_trim_fq = conf['sample']+'.ca.R1.fastq'
-    r_trim_fq = conf['sample']+'.ca.R2.fastq'
+    if "fastq_R_file" in conf.keys():
+        r_trim_fq = conf['sample']+'.ca.R2.fastq'
     target_name = conf["target_genome"].split('/')[-1]
-    
+    target_name = target_name.split('.')[0] + '_' + conf["aln"]
     base_name = '.'.join([conf['sample'],target_name,'filter'])
-    filtered_bam_file = base_name+'.bam'
+    filtered_bam_file = base_name + '.bam'
     if not os.path.isfile(filtered_bam_file): 
-        if not os.path.isfile(f_trim_fq) and not os.path.isfile(r_trim_fq):
-            # Step 1. fastq_clean if trimmed read fastq do not exists
+
+        # Step 1. fastq_clean if trimmed read fastq do not exists
+        # paired-end
+        if not os.path.isfile(f_trim_fq) and 'fastq_R_file' in conf.keys():
             fc_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
                                          sample_name=conf['sample'],path_to_cutadapt='cutadapt',
                                          ampl=conf["ampl"],params=conf["cutadapt_args"],
@@ -77,39 +81,62 @@ if __name__ == '__main__':
             assert os.path.isfile(conf['fastq_F_file'])
             assert os.path.isfile(conf['fastq_R_file'])
             sys.stderr.write('----fastq_clean.py----\n')
-            #try:
             fastq_clean.main(fc_args)
-            #except:
-            #    sys.exit(1)
             sys.stderr.write('----Complete!----\n')
-            
-        # Step 2. Align to target genome
-        target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
-        fb_args = argparse.Namespace(sample=conf['sample'], target_genome=conf["target_genome"],
-                                     path_to_bowtie2='bowtie2', bowtie2_args=conf["bowtie2_args"][1:-1])
-        sys.stderr.write('----fastq_to_bam.py----\n')
-        fastq_to_bam.main(fb_args)
+        # single-end
+        if not os.path.isfile(f_trim_fq) and 'fastq_R_file' not in conf.keys():
+            fcse_args = argparse.Namespace(fastq_file=conf['fastq_F_file'],
+                                         sample_name=conf['sample'],path_to_cutadapt='cutadapt',
+                                         ampl=conf["ampl"],params=conf["cutadapt_args"])
+            assert os.path.isfile(conf['fastq_F_file'])
+            sys.stderr.write('----fastq_clean_se.py----\n')
+            fastq_clean_se.main(fcse_args)
+            sys.stderr.write('----Complete!----\n')
 
-        if "contam_genome" in conf.keys(): 
+        # Step 2a. Align to target genome
+        target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
+        if conf['aln'] == 'bt2':
+            path_to_aligner = conf['path_to_bowtie2']
+            aligner_args = conf['bowtie2_args']
+        elif conf['aln'] == 'bbm':
+            path_to_aligner = conf['path_to_bbmap']
+            aligner_args = conf['bbmap_args']
+        else:
+            raise Exception('Invalid aligner!')
+        fb2t_args = argparse.Namespace(sample=conf['sample'], aligner=conf["aln"], reference_genome=conf["target_genome"],
+                                 path_to_aligner=path_to_aligner[1:-1], aligner_args=aligner_args[1:-1])
+        sys.stderr.write('----fastq_to_bam.py----\n')
+        fastq_to_bam.main(fb2t_args)
+
+        if "contam_genome" in conf.keys():  # contam filter
             contam_name = conf["contam_genome"].split('/')[-1]
+            contam_name = contam_name.split('.')[0] + '_' + conf["aln"]
             contam_sam_file = '.'.join([conf['sample'],contam_name,'sam'])
-            # Step 2a. Align to contamination genome
-            fb2_args = argparse.Namespace(sample=conf['sample'], target_genome=conf["contam_genome"], 
-                                     path_to_bowtie2='bowtie2', bowtie2_args=conf["bowtie2_args"][1:-1])
-            fastq_to_bam.main(fb2_args)
+            # Step 2b. Align to contamination genome
+            fb2c_args = argparse.Namespace(sample=conf['sample'],  aligner=conf["aln"], reference_genome=conf["contam_genome"], 
+                                         path_to_aligner=path_to_aligner[1:-1], aligner_args=aligner_args[1:-1])
+            fastq_to_bam.main(fb2c_args)
             sys.stderr.write('----Complete!----\n')
+
             # Step 3. contam_filter - remove contamination from the specified genome
             cf_args = argparse.Namespace(target_file=target_sam_file,contam_file=contam_sam_file,
                                          min_quality=20)
             sys.stderr.write('----contam_filter.py----\n')
             contam_filter.main(cf_args)
             sys.stderr.write('----Complete!----\n')
-        else:
+        else: # no contam filter
             sys.stderr.write('Sorting and indexing %s, resulting file %s\n' % (target_sam_file, filtered_bam_file))
-            pysam.sort(target_sam_file, filtered_bam_file[:-4])
+            sys.stderr.write('samtools view -bSq 20 %s | samtools sort -n - > %s\n'%(target_sam_file, filtered_bam_file))
+            p1 = subprocess.Popen(('samtools', 'view', '-bSq', '20', target_sam_file), stdout=subprocess.PIPE)
+            #with p1.stdout, open(filtered_bam_file, 'w') as outfile:
+            p2 = subprocess.Popen(('samtools', 'sort', '-', filtered_bam_file[:-4]), stdin=p1.stdout, stdout=subprocess.PIPE)
+            status=[p1.wait(),p2.wait()]
+            if p1.returncode != 0 or p1.returncode != 0:
+                sys.exit(1)
             pysam.index(filtered_bam_file)
             #os.remove(target_sam_file)
             sys.stderr.write('----Complete!----\n')
+
     # Step 4. Convert bam_to_beds with reads and positions if these files do not exist.
     reads_bed_file = base_name+'.reads.bed'
     pos_bed_file = base_name+'.pos.bed'
@@ -153,6 +180,7 @@ if __name__ == '__main__':
         sys.stderr.write('----region_dnacopy.R----\n')
         run_script(rd_command)
         sys.stderr.write('----Complete!----\n')
+    '''
     # Step 6. Calculate sample stats if these do not exist. Less detailed than control_stats.
     stat_file = conf['sample'] + '.stats.txt'
     if not os.path.isfile(stat_file):
@@ -173,4 +201,4 @@ if __name__ == '__main__':
         #except:
         #    sys.exit(1)
         sys.stderr.write('----Complete!----\n')
-
+    '''
