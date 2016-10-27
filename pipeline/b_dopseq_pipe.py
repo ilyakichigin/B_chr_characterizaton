@@ -39,19 +39,22 @@ def parse_config(config_file):
         for line in infile:
             line = line[:line.find('#')] # removes comments
             line_list = line.split('=')
-            if len(line_list) == 2:            
-                conf[line_list[0]]=line_list[1].strip(' ')
-            #elif len(line_list) == 1:
-            #    raise Exception(line+"\n This line in config has no parameter setting and is not comment")
+            if len(line_list) == 2:
+                if len(line_list[0]) > 0 and len(line_list[1]) > 0:
+                    conf[line_list[0]] = line_list[1].strip(' ')
+                else:
+                    raise Exception(line + "\nThis line in config has incomplete parameter setting")
+            elif len(line_list) == 1 and len(line) > 0:
+                raise Exception(line + "\nThis line in config has no parameter setting and is not comment")
             elif len(line_list) > 2:
-                raise Exception(line+"\n This line in config has too many '=' symbols")
+                raise Exception(line + "\nThis line in config has too many '=' symbols")
 
     return conf
 
 def run_script(command, run=False):
 
     # Err: Does not stop on errors from within
-    sys.stderr.write(' '.join(command)+'\n') 
+    sys.stderr.write(' '.join(command) + '\n') 
     process = subprocess.Popen(command) 
     process.wait()
     if process.returncode != 0: # error raised
@@ -62,21 +65,21 @@ if __name__ == '__main__':
     conf = parse_config(args.config_file)
     #dry_run = args.dry_run
     # !need to add executables check!
-    f_trim_fq = conf['sample']+'.ca.R1.fastq'
+    f_trim_fq = conf['sample'] + '.ca.R1.fastq'
     if "fastq_R_file" in conf.keys():
-        r_trim_fq = conf['sample']+'.ca.R2.fastq'
+        r_trim_fq = conf['sample'] + '.ca.R2.fastq'
     target_name = conf["target_genome"].split('/')[-1]
     target_name = target_name.split('.')[0] + '_' + conf["aln"]
-    base_name = '.'.join([conf['sample'],target_name,'filter'])
+    base_name = '.'.join([conf['sample'], target_name,'filter'])
     filtered_bam_file = base_name + '.bam'
     if not os.path.isfile(filtered_bam_file): 
 
         # Step 1. fastq_clean if trimmed read fastq do not exists
         # paired-end
         if not os.path.isfile(f_trim_fq) and 'fastq_R_file' in conf.keys():
-            fc_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'],fastq_R_file=conf['fastq_R_file'],
-                                         sample_name=conf['sample'],path_to_cutadapt='cutadapt',
-                                         ampl=conf["ampl"],params=conf["cutadapt_args"],
+            fc_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'], fastq_R_file=conf['fastq_R_file'],
+                                         sample_name=conf['sample'], path_to_cutadapt='cutadapt',
+                                         ampl=conf["ampl"], params=conf["cutadapt_args"],
                                          delimiter=' ', rename_only=False)
             assert os.path.isfile(conf['fastq_F_file'])
             assert os.path.isfile(conf['fastq_R_file'])
@@ -86,8 +89,8 @@ if __name__ == '__main__':
         # single-end
         if not os.path.isfile(f_trim_fq) and 'fastq_R_file' not in conf.keys():
             fcse_args = argparse.Namespace(fastq_file=conf['fastq_F_file'],
-                                         sample_name=conf['sample'],path_to_cutadapt='cutadapt',
-                                         ampl=conf["ampl"],params=conf["cutadapt_args"])
+                                         sample_name=conf['sample'], path_to_cutadapt='cutadapt',
+                                         ampl=conf["ampl"], params=conf["cutadapt_args"])
             assert os.path.isfile(conf['fastq_F_file'])
             sys.stderr.write('----fastq_clean_se.py----\n')
             fastq_clean_se.main(fcse_args)
@@ -119,18 +122,19 @@ if __name__ == '__main__':
             sys.stderr.write('----Complete!----\n')
 
             # Step 3. contam_filter - remove contamination from the specified genome
-            cf_args = argparse.Namespace(target_file=target_sam_file,contam_file=contam_sam_file,
-                                         min_quality=20)
+            cf_args = argparse.Namespace(target_file=target_sam_file, contam_file=contam_sam_file,
+                                         min_quality=conf['min_mapq'])
             sys.stderr.write('----contam_filter.py----\n')
             contam_filter.main(cf_args)
             sys.stderr.write('----Complete!----\n')
         else: # no contam filter
             sys.stderr.write('Sorting and indexing %s, resulting file %s\n' % (target_sam_file, filtered_bam_file))
-            sys.stderr.write('samtools view -bSq 20 %s | samtools sort -n - > %s\n'%(target_sam_file, filtered_bam_file))
-            p1 = subprocess.Popen(('samtools', 'view', '-bSq', '20', target_sam_file), stdout=subprocess.PIPE)
-            #with p1.stdout, open(filtered_bam_file, 'w') as outfile:
-            p2 = subprocess.Popen(('samtools', 'sort', '-', filtered_bam_file[:-4]), stdin=p1.stdout, stdout=subprocess.PIPE)
-            status=[p1.wait(),p2.wait()]
+            view_command = 'samtools view -bSq %s %s' % (conf['min_mapq'], target_sam_file)
+            sort_command = 'samtools sort - %s' % (filtered_bam_file[:-4])
+            sys.stderr.write('%s | %s\n' % (view_command, sort_command))
+            p1 = subprocess.Popen(view_command.split(), stdout=subprocess.PIPE)
+            p2 = subprocess.Popen(sort_command.split(), stdin=p1.stdout, stdout=subprocess.PIPE)
+            status = [p1.wait(),p2.wait()]
             if p1.returncode != 0 or p1.returncode != 0:
                 sys.exit(1)
             pysam.index(filtered_bam_file)
@@ -138,10 +142,10 @@ if __name__ == '__main__':
             sys.stderr.write('----Complete!----\n')
 
     # Step 4. Convert bam_to_beds with reads and positions if these files do not exist.
-    reads_bed_file = base_name+'.reads.bed'
-    pos_bed_file = base_name+'.pos.bed'
+    reads_bed_file = base_name + '.reads.bed'
+    pos_bed_file = base_name + '.pos.bed'
     if (not os.path.isfile(reads_bed_file) and not os.path.isfile(pos_bed_file)):
-        btb_args = argparse.Namespace(bam_file=filtered_bam_file,path_to_bedtools='bedtools')
+        btb_args = argparse.Namespace(bam_file=filtered_bam_file, path_to_bedtools='bedtools')
         sys.stderr.write('----bam_to_beds.py----\n')
         #try:
         bam_to_beds.main(btb_args)
@@ -149,9 +153,9 @@ if __name__ == '__main__':
         #    sys.exit(1)
         sys.stderr.write('----Complete!----\n')
     # Step 4a. Calculate control_stats if these do not exist.
-    stat_file = base_name+'.chrom.tsv'
+    stat_file = base_name + '.chrom.tsv'
     if not os.path.isfile(stat_file):
-        cs_args = argparse.Namespace(bed_basename='.'.join([conf['sample'],target_name,'filter']),
+        cs_args = argparse.Namespace(bed_basename='.'.join([conf['sample'], target_name,'filter']),
                                      sizes_file=conf['sizes_file'])
         # redirect stdout to file and then return it back
         sys.stderr.write('----control_stats.py----\n')        
@@ -165,18 +169,18 @@ if __name__ == '__main__':
             sys.stdout = saveout # return std
         sys.stderr.write('----Complete!----\n')
     # Step 4b. Draw control_plots.R if these do not exist.
-    control_plot_file = base_name+'.chrom.pdf'
+    control_plot_file = base_name + '.chrom.pdf'
     if not os.path.isfile(control_plot_file):
-        cp_command = [exec_path+'/control_plots.R',pos_bed_file,conf['sizes_file']]
+        cp_command = [exec_path + '/control_plots.R', pos_bed_file,conf['sizes_file']]
         sys.stderr.write('----control_plots.R----\n')
         run_script(cp_command)
         sys.stderr.write('----Complete!----\n')
     # Step 5. Perform region_dnacopy.R if regions do not exist.
-    regions_table = base_name+'.reg.tsv'
-    regions_plot = base_name+'.reg.pdf'
+    regions_table = base_name + '.reg.tsv'
+    regions_plot = base_name + '.reg.pdf'
     if not os.path.isfile(regions_table) or not os.path.isfile(regions_plot):
         # pdf height and width increased to get readable plot for all chromosomes 
-        rd_command = [exec_path+'/region_dnacopy.R',pos_bed_file,conf['sizes_file'],'20','20']
+        rd_command = [exec_path + '/region_dnacopy.R', pos_bed_file,conf['sizes_file'], '20', '20']
         sys.stderr.write('----region_dnacopy.R----\n')
         run_script(rd_command)
         sys.stderr.write('----Complete!----\n')

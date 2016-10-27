@@ -69,10 +69,10 @@ def compare_mapq(tname, cname, min_qual = 20):
     unmap_filename = tname[:-7]+'.unmap.unsort.bam'   
    
     with pysam.AlignmentFile(tname) as tfile, pysam.AlignmentFile(cname) as cfile:
-        sys.stderr.write('Comparing MAPQs. Target: %s, Contam: %s\n'%(tname,cname))        
+        sys.stderr.write('Comparing MAPQs. Target: %s, Contam: %s\n. Min MAPQ: %d'%(tname,cname, min_qual))
         filter_file = pysam.AlignmentFile(filter_filename,'wb', template=tfile)
         contam_file = pysam.AlignmentFile(contam_filename,'wb', template=cfile)
-        unmap_file = pysam.AlignmentFile(unmap_filename,'wb', template=tfile)   
+        unmap_file = pysam.AlignmentFile(unmap_filename,'wb', template=tfile)
         for tread in tfile:
             cread = cfile.next() # gets same line from contamination file
             assert tread.query_name == cread.query_name
