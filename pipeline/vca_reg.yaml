@@ -1,0 +1,38 @@
+# -*- mode: Yaml; -*-
+
+# sample name used as prefix for output file names
+sample: sample
+
+# path to BAM alignments
+bam_files: 
+    - sample_rep1.bam
+    - sample_rep2.bam
+# path to BED target regions: only for these intervals variants will be called and analyzed
+reg_bed: regions.verified.bed
+# path to reference genome fasta file (unpacked)     
+ref_genome: /path/to/genome/fasta
+
+# path to picard jar file 
+picard_path: /path/to/picard/jar
+# path to GATK jar file
+gatk_path: /path/to/gatk/jar
+# Memory allocated to GATK HaplotypeCaller
+gatk_mem: 8g
+# variant filtration expressions
+gatk_filters:
+    -select: "GQ_MEAN > 10.0"
+    -mvq: "50"
+
+# path to snpEff jar file
+snpEff_path: /path/to/snpEff/jar
+# snpEff gene&genome database. Lookup with "java -jar snpEff.jar databases | grep species".
+snpEff_genome: genome.ensembl_version
+
+# outputs
+# sample_rep*.rmdup.bam - alignments with marked duplicates
+# sample_rep*.g.vcf - VCF at bp resolution with raw variant calls for each BAM file
+# sample.vcf - variant calls adjusted for multiple sample replicates 
+# sample.hq.vcf - variant calls passing filters
+# sample.hq.ann.vcf - annotated variant calls passing filters
+# sample.hq.ann.summary.html - annotation statistics for variant calls passing filters
+# sample.hq.ann.summary.genes.txt - per-gene statistics for variant calls passing filters
