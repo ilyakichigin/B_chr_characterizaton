@@ -18,17 +18,17 @@ def parse_command_line_arguments():
                     Output files: sample.ca.R1.fastq, sample.ca.R2.fastq, sample.ca.log. 
                     """
                     )
+    parser.add_argument("sample_name", help="sample name - used as output prefix")
+
     parser.add_argument("fastq_F_file", help="fastq file with forward reads (.fastq or .fastq.gz)")
 
-    parser.add_argument("fastq_R_file", help="fastq file with reverse reads (.fastq or .fastq.gz)")
+    parser.add_argument("fastq_R_file", nargs='?', default=None, help="Optional: fastq file with reverse reads (.fastq or .fastq.gz)")
 
-    parser.add_argument("--sample_name", help="sample name - used as output prefix")
-
-    parser.add_argument("-r", "--rename_only", action="store_true", default=False, help="only fix fastq format")
-
-    parser.add_argument("-d", "--delimiter", default=" ", help="delimiter between cluster name and read number")
+    parser.add_argument("-d", "--dry_run", action="store_true", default=False, help="print out commands and exit")
 
     parser.add_argument("--path_to_cutadapt", default="cutadapt", help="path to cutadapt binary")
+
+    parser.add_argument("--trim_illumina", action="store_true", default=True, help="trim illumina adapters")
 
     parser.add_argument("--ampl", default="dop", help="Amplification protocol - used to remove specific primers. Possible values: dop, wga, none")
 
@@ -37,87 +37,62 @@ def parse_command_line_arguments():
         For WGA it is sometimes useful to increase error toleance with -e")
 
     return parser.parse_args()
-   
-def rename_reads(in_file_name, delimiter, gzipped=False):
-
-    # Rename reads in fastq files - remove space between cluster name and number: 1 for F, 2 for R.
-    # This is done for cutadapt compatibility
-    #delimiter = delimiter.strip('\'\"')
-    assert len(delimiter) == 1
-    
-    if gzipped:
-        in_file = GzipFile(in_file_name, 'r')
-    else:
-        in_file = open(in_file_name, 'r')
-    in_file_base = in_file_name.split('/')[-1] # output to current folder
-    filename_delim = -2 if gzipped else -1
-    out_file_name = '.'.join(in_file_base.split('.')[:filename_delim]+['rn','fastq'])
-    sys.stderr.write("Renaming reads in %s. Writing to %s.\n" % (in_file_name,out_file_name))
-    with open(out_file_name, 'w') as out_file:
-        for line in in_file:
-            line_list = line.split(delimiter)
-            if line.startswith('@') and len(line_list) > 1:
-                out_line = line_list[0] + '/' + line_list[1][0] + '\n' # leave \1 for F and \2 for R
-            elif line.startswith('+'):
-                out_line = '+\n'
-            else:
-                out_line = line
-            out_file.write(out_line)
-    in_file.close() # According to the socumentation does not work for GzipFile
-
-    return out_file_name
 
 def main(args):
     
-    if args.fastq_F_file.endswith('.fastq') and args.fastq_R_file.endswith('.fastq'): 
+    if args.fastq_R_file == None:
+        reads = [args.fastq_F_file]
+    else:
+        reads = [args.fastq_F_file, args.fastq_R_file]
+    '''# plain or gzipped input
+    if all(read.endswith('.fastq') for read in reads): 
         gzipped = False
-    elif args.fastq_F_file.endswith('.fastq.gz') and args.fastq_R_file.endswith('.fastq.gz'): 
+    elif all(read.endswith('.fastq.gz') for read in reads):
         gzipped = True
     else:
-        print 'Improper read naming:\n%s\n%s' % (args.fastq_F_file, args.fastq_R_file)
-        sys.exit(1)
+        raise Exception('Improper read naming:\n%s\nValid file extensions are .fastq for \
+         uncompressed and .fastq.gz for gzipped reads' % (args.fastq_F_file, args.fastq_R_file))
+    '''
+    ca_reads = [args.sample_name + '.ca.R1.fastq', args.sample_name + '.ca.R2.fastq']
+    log_file = args.sample_name + '.ca.log'
+    if not os.path.isfile(ca_reads[0]):
+        # custom parameters
+        cutadapt_opts = args.path_to_cutadapt + ' ' + args.params.strip("\'\"")
+        # remove Illumna TruSeq adapters
+        if args.trim_illumina:
+            cutadapt_opts += ' -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC '
+            if len(reads) == 2:
+               cutadapt_opts += ' -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT '
+        # remove primers from both ends of reads depending on the protocol
+        if args.ampl == 'dop':
+            cutadapt_opts += ' -n 3 -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG '
+            if len(reads) == 2:
+                cutadapt_opts += ' -A CCACATNNNNNNCTCGAGTCGG -G CCGACTCGAGNNNNNNATGTGG '
+        elif args.ampl == 'wga':
+            cutadapt_opts += '-n 3 -a CCAAACACACCCAACACAA -g TTGTGTTGGGTGTGTTTGG '
+            if len(reads) == 2:
+                cutadapt_opts += '-A CCAAACACACCCAACACAA -G TTGTGTTGGGTGTGTTTGG'
+        elif args.ampl == 'none':
+            cutadapt_opts += ' '
+        else:
+             raise Exception('Unknown amplification protocol. Known ones - dop, wga, none')
+        # inputs and outputs. Note that reads left unpaired after trimming are discarded.
+        if len(reads) == 1:
+            cutadapt_opts += ' -o %s %s' % (ca_reads[0], reads[0])
+        elif len(reads) == 2:
+            cutadapt_opts += ' -o %s -p %s %s %s' % (ca_reads[0], ca_reads[1], reads[0], reads[1])
 
-    # rename reads
-    f_rn_fq = rename_reads(args.fastq_F_file, args.delimiter, gzipped) # Filename returned. rn = renamed
-    r_rn_fq = rename_reads(args.fastq_R_file, args.delimiter, gzipped)
-    
-    if not args.rename_only: 
-        f_ca_fq = args.sample_name + '.ca.R1.fastq'
-        r_ca_fq = args.sample_name + '.ca.R2.fastq'
-        log_file = args.sample_name + '.ca.log'
-        # rename and cutadapt if not already done
-        if not os.path.isfile(f_ca_fq) and not os.path.isfile(r_ca_fq):
-            
-            # common options: remove Illumna TruSeq adapters, apply additional parameters.
-            cutadapt_opts = args.path_to_cutadapt + ' -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT ' + \
-                                                    args.params.strip("\'\"")
-            # remove primers from both ends of reads depending on the protocol
-            if args.ampl == 'dop':
-                cutadapt_opts += ' -a CCACATNNNNNNCTCGAGTCGG -g CCGACTCGAGNNNNNNATGTGG -A CCACATNNNNNNCTCGAGTCGG -G CCGACTCGAGNNNNNNATGTGG -n 3'
-            elif args.ampl == 'wga':
-                cutadapt_opts += ' -a CCAAACACACCCAACACAA -g TTGTGTTGGGTGTGTTTGG -A CCAAACACACCCAACACAA -G TTGTGTTGGGTGTGTTTGG -n 3'
-            elif args.ampl == 'none':
-                cutadapt_opts += ' '
-            else:
-                 raise Exception('Unknown amplification protocol. Known ones - dop, wga, none')
-            # inputs and outputs. Note that reads left unpaired after trimming are discarded.
-            cutadapt_opts += ' -o %s -p %s %s %s' % (f_ca_fq,r_ca_fq,f_rn_fq,r_rn_fq)
+        sys.stderr.write(cutadapt_opts + ' 2> %s\n' % (log_file)) 
+        if not args.dry_run:
             with open(log_file, 'w') as log:
-                sys.stderr.write(cutadapt_opts+'\n') 
                 process = subprocess.Popen(cutadapt_opts.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
                 (out, err) = process.communicate()
                 log.write(out)
                 sys.stderr.write(err)
                 if process.returncode != 0:
                     sys.exit()
-            sys.stderr.write('rm %s %s\n' % (f_rn_fq,r_rn_fq))
-            os.remove(f_rn_fq)
-            os.remove(r_rn_fq)
-        else:
-            print 'Files with removed adapters exist. OK!'
     else:
-        print 'No adapter trimming. OK!'
-
+        sys.stderr.write('%s reads with removed adapters exist. OK!\n' % (args.sample_name + '.ca.R*.fastq'))
 
 if __name__ == '__main__':
     main(parse_command_line_arguments())

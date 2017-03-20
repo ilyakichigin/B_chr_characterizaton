@@ -1,5 +1,4 @@
 # Processing of sequencing data of DOP-PCR libraries from isolated chromosomes 
-# Some parameters not listed here are available in separate scripts (see Pipeline step-by-step).
 # Pipeline can be started from properly named intermediate files (see Pipeline step-by-step).
 # Usage: dopseq_pipe.py dopseq_pipe.config
 # Output files are written to current folder. For details see comments below.
@@ -8,34 +7,45 @@
 
 ### Assignable parameters
 
-# sample
-sample=VVUB # sample name - used as prefix for all files
-fastq_F_file=../examples/test.F.fastq # path to file with forward reads
-fastq_R_file=../examples/test.R.fastq # path to file with reverse reads, comment out in case of single-end reads
+# sample name - used as prefix for all files
+sample: VVUB
+
+# path to file with forward reads
+fastq_F_file: ../examples/test.F.fastq
+# path to file with reverse reads, comment out in case of single-end reads
+fastq_R_file: ../examples/test.R.fastq 
 
 # genomes
 # note that for bowtie2 index files are expected in the same folder with proper basenames: e.g. canFam3 for canFam3.masked.fasta 
-target_genome=../../../../genome/canFam3/canFam3.masked.fa # path to fasta file of target genome
+target_genome: ../../../../genome/canFam3/canFam3.masked.fa # path to fasta file of target genome
 # commenting out contam_genome disables alignment to contamination genome and contam_filter (Step 3.)
-contam_genome=../../../genomes/hg19/hg19.fa # path to fasta file of contamination genome (human in our case)
+contam_genome: ../../../genomes/hg19/hg19.fa # path to fasta file of contamination genome (human in our case)
 
-# cutadapt
-ampl=wga # Amplification protocol - used to remove specific primers. Possible values: dop, wga, none.
-cutadapt_args="--trim-n --minimum-length 20" # Additional parameters for bowtie2 specified as quoted string.
+# read trimming
+cutadapt_path: cutadapt # do not use '~' in path
+# Amplification protocol - used to remove specific primers. Possible values: dop, wga, none.
+ampl: wga 
+# Additional parameters for bowtie2 specified as quoted string.
+cutadapt_args: "--trim-n --minimum-length 20" 
 # For WGA you may want to increase error toleance with -e 0.2-0.3
 
 # read mapping
-aln=bt2 # Aligner to use. Possible values: bt2 (for bowtie2), bbm (for bbmap_args)
-path_to_bowtie2='bowtie2'
-bowtie2_args="-p 1 --local" # Additional parameters for bowtie2 specified as quoted string.
-# --local option was routinely used in cervid B chromosomes paper as an optimization for between-species alignment.
-path_to_bbmap='bbmap.sh' # do not use '~' in path
-bbmap_args=" " # Additional parameters for bbmap specified as quoted string.
+aln: bt2 # Aligner to use. Possible values: bt2 (for bowtie2), bbm (for bbmap_args)
+bowtie2_path: bowtie2 # do not use '~' in path
+# Additional parameters for bowtie2 specified as quoted string
+bowtie2_args: "-p 1 --very-sensitive-local" 
+bbmap_path: bbmap.sh # do not use '~' in path
+# Additional parameters for bbmap specified as quoted string.
 # nodisc option can be used in order to prevent genome index writing to working directory
-min_mapq=20 # minimum mapping quality for mapped reads. Works both with and without contamination filtering.
+bbmap_args: " " 
 
+# read filtering
+# minimum mapping quality for mapped read retention. Works both with and without contamination filtering.
+min_mapq: 20 
+
+# region calling
 # Only chromosomes listed in this file are processed in region calling
-sizes_file=../examples/canFam3.sizes # tab-separated file with chromosomes and their sizes.
+sizes_file: ../examples/canFam3.sizes # tab-separated file with chromosomes and their sizes.
 
 ### Pipeline step-by-step
 

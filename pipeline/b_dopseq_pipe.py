@@ -1,21 +1,21 @@
 #!/usr/bin/env python
 
-import subprocess
-import argparse
-import os.path
-import pysam
-
+import os
 import sys
+import yaml
+import pysam
+import argparse
+import subprocess
+
 exec_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..","exec"))
 sys.path.append(exec_path)
 
 import fastq_clean
-import fastq_clean_se
-import fastq_to_bam
+import fastq_aln
 import contam_filter
-import bam_to_beds
-import control_stats
-import sample_stats
+import bam_to_bed
+#import control_stats
+#import sample_stats
 
 def parse_command_line_arguments():
 
@@ -26,90 +26,123 @@ def parse_command_line_arguments():
                     """
                     )
     parser.add_argument("config_file", help="input configuration file")
-    #parser.add_argument("-d", "--dry-run", action="store_true",
-    #                    help="Check all dependencies and print out all commands")
+    parser.add_argument("-d", "--dry_run", action="store_true", default=False,
+                        help="Check all dependencies and print out all commands")
     
     return parser.parse_args()
 
-def parse_config(config_file):
-    
-    conf = dict()
-    
-    with open(config_file) as infile:
-        for line in infile:
-            line = line[:line.find('#')] # removes comments
-            line_list = line.split('=')
-            if len(line_list) == 2:
-                if len(line_list[0]) > 0 and len(line_list[1]) > 0:
-                    conf[line_list[0]] = line_list[1].strip(' ')
-                else:
-                    raise Exception(line + "\nThis line in config has incomplete parameter setting")
-            elif len(line_list) == 1 and len(line) > 0:
-                raise Exception(line + "\nThis line in config has no parameter setting and is not comment")
-            elif len(line_list) > 2:
-                raise Exception(line + "\nThis line in config has too many '=' symbols")
+#def run_module_main(module, args):
 
-    return conf
+def generate_filenames(sample, target_path, contam_path):
 
-def run_script(command, run=False):
+    names = dict()
+    names['f_trim_fq'] = sample + '.ca.R1.fastq'
+    names['r_trim_fq'] = sample + '.ca.R2.fastq'
+    names['target_path'] = target_path
+    names['contam_path'] = contam_path
+    names['target_name'] = target_path.split('/')[-1].split('.')[0]
+    names['target_index_prefix'] = '/'.join(target_path.split('/')[:-1]) + names['target_name']
+    names['contam_name'] = contam_path.split('/')[-1].split('.')[0]
+    names['contam_index_prefix'] = '/'.join(target_path.split('/')[:-1]) + names['contam_name']
+    names['target_sam'] = '.'.join([sample,names['target_name'],'sam'])
+    names['contam_sam'] = '.'.join([sample,names['contam_name'],'sam'])
+    names['filtered_bam'] = '.'.join([sample,names['target_name'],'filter','bam'])
+    names['pos_bed'] = '.'.join([sample,names['target_name'],'pos','bed'])
+    names['reg_tsv'] = '.'.join([sample,names['target_name'],'reg','tsv'])
+    names['reg_pdf'] = '.'.join([sample,names['target_name'],'reg','pdf'])
 
-    # Err: Does not stop on errors from within
-    sys.stderr.write(' '.join(command) + '\n') 
-    process = subprocess.Popen(command) 
-    process.wait()
-    if process.returncode != 0: # error raised
-        sys.exit(1)
+    return names
 
 if __name__ == '__main__':
+
+    # parse arguments and config
     args = parse_command_line_arguments()
-    conf = parse_config(args.config_file)
-    #dry_run = args.dry_run
-    # !need to add executables check!
-    f_trim_fq = conf['sample'] + '.ca.R1.fastq'
-    if "fastq_R_file" in conf.keys():
-        r_trim_fq = conf['sample'] + '.ca.R2.fastq'
-    target_name = conf["target_genome"].split('/')[-1]
-    target_name = target_name.split('.')[0] + '_' + conf["aln"]
+    with open(args.config_file) as conf_file:
+        conf = yaml.safe_load(conf_file)
+
+    # dry run notification
+    if args.dry_run:
+        sys.stderr.write('This is a dry run. Only command listing will be produced.\n')
+
+
+    # ?add executables check here?
+    
+    # generate names
+    if 'contam_genome' not in conf.keys(): # no contam filtering
+        conf['contam_genome'] = conf['target_genome']
+    fnames = generate_filenames(conf['sample'],conf['target_genome'],conf['contam_genome'])
+    if 'fastq_R_file' not in conf.keys(): # single-end input reads
+        conf['fastq_R_file'] = None
+        fnames['r_trim_fq'] = None
+
+    if not os.path.isfile(fnames['filtered_bam']):
+        sys.stderr.write('----fastq_clean.py----\n') # trim adapters
+        fc_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'], fastq_R_file=conf['fastq_R_file'],
+                                     sample_name=conf['sample'], path_to_cutadapt=conf['cutadapt_path'],
+                                     ampl=conf['ampl'], params=conf['cutadapt_args'],
+                                     dry_run=args.dry_run, trim_illumina=True)
+        
+        fastq_clean.main(fc_args)
+        sys.stderr.write('----Complete!----\n')
+
+        sys.stderr.write('----fastq_aln.py----\n') # align reads
+        if conf['aln'] == 'bt2':
+            aligner_path = conf['bowtie2_path']
+            aligner_args = conf['bowtie2_args']
+        elif conf['aln'] == 'bbm':
+            aligner = conf['bbmap_path']
+            aligner_args = conf['bbmap_args']
+        else:
+            raise Exception('Invalid aligner!')
+        for g in ('target', 'contam'):
+            fa_args = argparse.Namespace(fastq_F_file=fnames['f_trim_fq'], 
+                fastq_R_file=fnames['r_trim_fq'], aligner=conf['aln'], 
+                reference_genome=fnames[g + '_path'], path_to_aligner=aligner_path, 
+                aligner_args=aligner_args, dry_run = args.dry_run)
+            fastq_aln.main(fa_args)
+        sys.stderr.write('----Complete!----\n')
+
+        sys.stderr.write('----contam_filter.py----\n') # filter contamination
+        cf_args = argparse.Namespace(target_sam=fnames['target_sam'], contam_sam=fnames['contam_sam'],
+                                     min_quality=conf['min_mapq'], dry_run = args.dry_run)
+        contam_filter.main(cf_args)
+        sys.stderr.write('----Complete!----\n')
+        '''
+        os.remove(fnames['target_sam'])
+        if conf['contam_genome'] != conf['target_genome']:
+            os.remove(fnames['contam_sam'])
+        '''
+    else:
+        sys.stderr.write('%s filtered alignment to target genome exists. Skipping steps for its generation.\n' % fnames['filtered_bam'])
+    sys.stderr.write('----bam_to_bed.py----\n') # create bed file with positions covered by reads
+    btb_args = argparse.Namespace(bam_file=fnames['filtered_bam'], bedtools_path='bedtools', 
+        dry_run = args.dry_run)
+    bam_to_bed.main(btb_args)
+    sys.stderr.write('----Complete!----\n')
+
+    # predict chromosome-specific regions
+    sys.stderr.write('----region_dnacopy.R----\n')
+    if not os.path.isfile(fnames['reg_tsv']):
+        rd_command = [exec_path + '/region_dnacopy.R', fnames['pos_bed'], conf['sizes_file'], '20', '20']
+        sys.stderr.write(' '.join(rd_command)+'\n')
+        if not args.dry_run:
+            p = subprocess.Popen(rd_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
+            (out, err) = p.communicate()
+            if p.returncode != 0:
+                raise Exception("region_dnacopy.R failed:\n\n%s" % (err))
+    else:
+        sys.stderr.write('%s chromosome region prediction file exists. OK!\n' % fnames['reg_tsv'])
+    sys.stderr.write('----Complete!----\n')
+'''
     base_name = '.'.join([conf['sample'], target_name,'filter'])
     filtered_bam_file = base_name + '.bam'
     if not os.path.isfile(filtered_bam_file): 
 
         # Step 1. fastq_clean if trimmed read fastq do not exists
         # paired-end
-        if not os.path.isfile(f_trim_fq) and 'fastq_R_file' in conf.keys():
-            fc_args = argparse.Namespace(fastq_F_file=conf['fastq_F_file'], fastq_R_file=conf['fastq_R_file'],
-                                         sample_name=conf['sample'], path_to_cutadapt='cutadapt',
-                                         ampl=conf["ampl"], params=conf["cutadapt_args"],
-                                         delimiter=' ', rename_only=False)
-            assert os.path.isfile(conf['fastq_F_file'])
-            assert os.path.isfile(conf['fastq_R_file'])
-            sys.stderr.write('----fastq_clean.py----\n')
-            fastq_clean.main(fc_args)
-            sys.stderr.write('----Complete!----\n')
-        # single-end
-        if not os.path.isfile(f_trim_fq) and 'fastq_R_file' not in conf.keys():
-            fcse_args = argparse.Namespace(fastq_file=conf['fastq_F_file'],
-                                         sample_name=conf['sample'], path_to_cutadapt='cutadapt',
-                                         ampl=conf["ampl"], params=conf["cutadapt_args"])
-            assert os.path.isfile(conf['fastq_F_file'])
-            sys.stderr.write('----fastq_clean_se.py----\n')
-            fastq_clean_se.main(fcse_args)
-            sys.stderr.write('----Complete!----\n')
 
-        # Step 2a. Align to target genome
-        target_sam_file = '.'.join([conf['sample'],target_name,'sam'])
-        if conf['aln'] == 'bt2':
-            path_to_aligner = conf['path_to_bowtie2']
-            aligner_args = conf['bowtie2_args']
-        elif conf['aln'] == 'bbm':
-            path_to_aligner = conf['path_to_bbmap']
-            aligner_args = conf['bbmap_args']
-        else:
-            raise Exception('Invalid aligner!')
-        fb2t_args = argparse.Namespace(sample=conf['sample'], aligner=conf["aln"], reference_genome=conf["target_genome"],
-                                 path_to_aligner=path_to_aligner[1:-1], aligner_args=aligner_args[1:-1])
-        sys.stderr.write('----fastq_to_bam.py----\n')
-        fastq_to_bam.main(fb2t_args)
+
+        
 
         if "contam_genome" in conf.keys():  # contam filter
             contam_name = conf["contam_genome"].split('/')[-1]
@@ -184,7 +217,7 @@ if __name__ == '__main__':
         sys.stderr.write('----region_dnacopy.R----\n')
         run_script(rd_command)
         sys.stderr.write('----Complete!----\n')
-    '''
+    
     # Step 6. Calculate sample stats if these do not exist. Less detailed than control_stats.
     stat_file = conf['sample'] + '.stats.txt'
     if not os.path.isfile(stat_file):
