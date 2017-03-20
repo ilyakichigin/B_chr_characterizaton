@@ -1,12 +1,12 @@
 # Introduction
 
-DOPseq_analyzer is a a set of tools for processing of Illumina sequencing data obtained from isolated (flow sorted or microdissected) chromosomes amplified with Degenerate-Oligonucleotide-Primed PCR (DOP-PCR) or WGA. It divides the genome used as reference into regions based on density of positions covered by reads. Regions with higher position density can be further interpreted as target (specific to isolated chromosomes). Note that these regions cannot be used 'as is' and require manual inspection and correction. 
+DOPseq_analyzer is a a set of tools for processing of sequencing data of isolated (flow sorted or microdissected) chromosomes amplified with Degenerate-Oligonucleotide-Primed PCR (DOP-PCR) or WGA. It divides the reference genome into regions based on density of positions covered by reads. Regions with higher position density can be further interpreted as target (specific to isolated chromosomes). Note that these regions cannot be used 'as is' and require manual inspection and correction. 
 
 Currently, three pipelines are implemented: 
 
-1. Analysis of B chromosomes (pipeline/b_dopseq_pipe.py) includes read trimming, alignment to reference genome, contamination filtering, region calling and statistics calculation. Details on processing steps and additional routines for repetitive DNA characterization with RepeatExplorer and variant calling are described at the end of the configuration file (pipeline/b_dopseq_pipe.config). Maintained by drevoz.
+1. Analysis of B chromosomes (pipeline/b_dopseq_pipe.py) includes read trimming, alignment to reference genome, contamination filtering, region calling and statistics calculation. Details on processing steps and additional routines for repetitive DNA characterization with RepeatExplorer and variant calling are described at the end of the configuration file (pipeline/b_dopseq_pipe.config).
 2. Analysis of anole microchromosomes (anolis/pipeline/anolis_dopseq_pipe.py) includes similar steps. It is optimized for reference genomes consisting of scaffolds and has a possibility to handle WGA libraries. Maintained by ilyakichigin.
-3. Variant calling for validated chromosome-specific regions with GATK HaplotypeCaller (pipeline/vca_reg.py). Maintained by drevoz.
+3. Variant calling for validated chromosome-specific regions with GATK HaplotypeCaller (pipeline/vca_reg.py).
 
 # Installation and usage
 
@@ -20,7 +20,7 @@ Dependancies:
 
 4. bedtools (tested on v.2.17.0 and v.2.24.0)
 
-5. DNAcopy R package 
+5. DNAcopy R (Bioconductor) package 
 
 6. (Optional - for subsequent variant calling and annotation) GATK (tested on v.3.3.0), picard-tools (tested on v.1.125), snpEff (tested on v.3.3.0)
 
