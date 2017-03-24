@@ -20,7 +20,7 @@ def parse_command_line_arguments():
     parser.add_argument("fastq_R_file", nargs='?', default=None, help="Optional: fastq file with reverse reads")
 
     parser.add_argument("-a", "--aligner", default="bt2", 
-        help="aligner to use. Possible values: bt2 (bowtie2), bbm (bbmap)")
+        help="aligner to use. Possible values: bt2 (bowtie2), bwa, bbm (bbmap)")
 
     parser.add_argument("-r", "--reference_genome", help="path to reference genome fasta")
 
@@ -35,10 +35,13 @@ def parse_command_line_arguments():
 
     return parser.parse_args()
 
-def run_aligner(command, log_file, dry_run=False):
+def run_aligner(command, log_file, dry_run=False, stdout_file=None):
     
     # run command logging to a file
-    sys.stderr.write(command + ' 2> %s\n' % (log_file)) 
+    sys.stderr.write(command)
+    if stdout_file is not None:
+        sys.stderr.write(' > %s' % (stdout_file))
+    sys.stderr.write(' 2> %s\n' % (log_file)) 
     if not dry_run:
         process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
         (out, err) = process.communicate()
@@ -46,6 +49,9 @@ def run_aligner(command, log_file, dry_run=False):
             log.write(err)
         if process.returncode != 0:
             raise Exception("Something went wrong. Check %s for details." % (log_file))
+        if stdout_file is not None:
+            with open(stdout_file, 'w') as out_sam:
+                out_sam.write(out)
 
 def main(args):    
 
@@ -68,7 +74,24 @@ def main(args):
             else:
                 command = '%s %s -1 %s -2 %s -x %s -S %s' % (args.path_to_aligner, 
                     args.aligner_args, args.fastq_F_file, args.fastq_R_file, rg_path, out_sam)
+            run_aligner(command, log_file, args.dry_run)
+
+        elif args.aligner == 'bwa':
+            if args.path_to_aligner == "bowtie2":
+                args.path_to_aligner = "bwa"
+            if not os.path.isfile(rg_path + '.bwt'):
+                raise Exception('bowtie2 index not found. Expected path and prefix: %s' % rg_path)
+            if args.fastq_R_file == None:
+                command = '%s %s %s %s' % (args.path_to_aligner, 
+                    args.aligner_args, rg_path, args.fastq_F_file)
+            else:
+                command = '%s %s %s %s %s' % (args.path_to_aligner, 
+                    args.aligner_args, rg_path, args.fastq_F_file, args.fastq_R_file)
+            run_aligner(command, log_file, args.dry_run, out_sam)
+
         elif args.aligner == 'bbm':
+            if args.path_to_aligner == "bowtie2":
+                args.path_to_aligner = "bbmap.sh"
             assert os.path.isfile(args.reference_genome)
             if args.fastq_R_file == None:
                 command = '%s %s in%s ref=%s out=%s' % (args.path_to_aligner, 
@@ -76,9 +99,11 @@ def main(args):
             else:
                 command = '%s %s in1=%s in2=%s ref=%s out=%s' % (args.path_to_aligner, 
                     args.aligner_args, args.fastq_F_file, args.fastq_R_file, args.reference_genome, out_sam)
+            run_aligner(command, log_file, args.dry_run)
+
         else:
             raise Exception('Invalid aligner!')
-        run_aligner(command, log_file, args.dry_run)
+        
 
     else:
         sys.stderr.write('%s alignment to reference genome exists. OK!\n' % out_sam)

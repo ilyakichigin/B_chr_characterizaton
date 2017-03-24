@@ -1,106 +1,84 @@
 # Processing of sequencing data of DOP-PCR libraries from isolated chromosomes 
-# Pipeline can be started from properly named intermediate files (see Pipeline step-by-step).
-# Usage: dopseq_pipe.py dopseq_pipe.config
+# Usage: dopseq_pipe.py [-d] dopseq_pipe.config
+# Option: -d - dry run: print out commands and exit
 # Output files are written to current folder. For details see comments below.
 # Expects all executables in ../exec/ relative to b_dopseq_pipe.py
 
-
 ### Assignable parameters
 
-# sample name - used as prefix for all files
+# sample name - used as prefix for output files
 sample: VVUB
 
 # path to file with forward reads
-fastq_F_file: ../examples/test.F.fastq
+fastq_F_file: test.F.fastq
 # path to file with reverse reads, comment out in case of single-end reads
-fastq_R_file: ../examples/test.R.fastq 
+fastq_R_file: test.R.fastq 
 
 # genomes
-# note that for bowtie2 index files are expected in the same folder with proper basenames: e.g. canFam3 for canFam3.masked.fasta 
-target_genome: ../../../../genome/canFam3/canFam3.masked.fa # path to fasta file of target genome
+# path to fasta file of target genome
+target_genome: /genome/canFam3/canFam3.masked.fa 
+# path to fasta file of contamination genome (human in our case)
 # commenting out contam_genome disables alignment to contamination genome and contam_filter (Step 3.)
-contam_genome: ../../../genomes/hg19/hg19.fa # path to fasta file of contamination genome (human in our case)
+contam_genome: /genome/hg19/hg19.fa 
+# note that for bowtie2 and bwa index files are expected in the same folder with proper basenames: 
+# e.g. canFam3 for canFam3.masked.fasta, hg19 for hg19.fa 
 
 # read trimming
 cutadapt_path: cutadapt # do not use '~' in path
-# Amplification protocol - used to remove specific primers. Possible values: dop, wga, none.
+# amplification protocol - used to remove specific primers. Possible values: dop, wga, none.
 ampl: wga 
-# Additional parameters for bowtie2 specified as quoted string.
+# additional parameters for cutadapt specified as quoted string
 cutadapt_args: "--trim-n --minimum-length 20" 
-# For WGA you may want to increase error toleance with -e 0.2-0.3
+# for WGA you may want to increase error toleance with -e 0.2-0.3
 
 # read mapping
-aln: bt2 # Aligner to use. Possible values: bt2 (for bowtie2), bbm (for bbmap_args)
+# Aligner to use. Possible values: bt2 (for bowtie2), bwa, bbm (for bbmap)
+aln: bt2 
 bowtie2_path: bowtie2 # do not use '~' in path
 # Additional parameters for bowtie2 specified as quoted string
 bowtie2_args: "-p 1 --very-sensitive-local" 
+bwa_path: bwa # do not use '~' in path
+# Additional parameters for bwa specified as quoted string
+bwa_args: "mem -t 1" 
 bbmap_path: bbmap.sh # do not use '~' in path
 # Additional parameters for bbmap specified as quoted string.
 # nodisc option can be used in order to prevent genome index writing to working directory
-bbmap_args: " " 
+bbmap_args: "threads=1" 
 
 # read filtering
 # minimum mapping quality for mapped read retention. Works both with and without contamination filtering.
 min_mapq: 20 
 
 # region calling
-# Only chromosomes listed in this file are processed in region calling
-sizes_file: ../examples/canFam3.sizes # tab-separated file with chromosomes and their sizes.
+# tab-separated file with chromosomes and their sizes.
+# only chromosomes listed in this file are processed in region calling
+sizes_file: ../examples/canFam3.sizes 
 
 ### Pipeline step-by-step
 
-# Step 1. fastq_clean.py - Removes residual Illumina adapters and primers from pair of input fastq read files
-# Other parameters: --rename_only --delimiter --path_to_cutadapt
-# Output files: sample.ca.R1.fastq(.gz), sample.ca.R2.fastq(.gz), sample.ca.log
-#or
-# Step 1. fastq_clean_se.py - Removes residual Illumina adapters and primers single-end input fastq read file
-# Other parameters: --path_to_cutadapt
-# Output files: sample.ca.fastq, sample.ca.log
+# Step 1. fastq_clean.py - removes residual Illumina adapters and primers from input fastq files
+# Output files: sample.ca.R1.fastq(.gz), [sample.ca.R2.fastq(.gz),] sample.ca.log
 
-# Step 2. fastq_to_bam.py - Aligns trimmed reads to target and contamination genomes using bowtie2 or bbmap.
-# Input files to start from this step: sample.ca.R1.fastq, sample.ca.R2.fastq
-# Other parameters: --aligner --reference_genome --path_to_aligner --aligner_args
-# Output files: sample.target_genome.sam, sample.contam_genome.sam (both removed in Step 3), sample.target_genome.bt2.log, sample.contam_genome.bt2.log.
+# Step 2. fastq_aln.py - aligns trimmed reads to target and contamination genomes using bowtie2, bwa or bbmap.
+# Output files: sample.target_genome.sam, sample.target_genome.bt2.log, [sample.contam_genome.sam, sample.contam_genome.bt2.log]
 
 # Step 3. contam_filter.py - Removes contamination reads by comparing MAPQs to target and cotamination genomes. Outputs sorted and indexed bams.
-# Other parameters: --path_to_bowtie2
 # Requires pysam
-# Output files: sample.target_genome.filter.bam, sample.target_genome.unmap.bam, sample.contam_genome.contam.bam + .bai indices
+# Output file: sample.target_genome.filter.bam
 
-# Step 4. bam_to_beds.py - From filtered bam file creates reads and positions bed files.
+# Step 4. bam_to_bed.py - creates bed file with non-overlapping positions of reads in target genome
 # Input files to start from this step: sample.target_genome.filter.bam
 # Other parameters: --path_to_bedtools
-# Output files: sample.target_genome.filter.reads.bed, sample.target_genome.filter.pos.bed
+# Output file: sample.target_genome.filter.pos.bed
 
-# Step 4a. control_stats.py - From reads and positions bed files calculates statistics for each chromosome. Makes sense only for control libraries: chromosomes of target geonome.
-# Runs if output file does not exist
-# Requires numpy
-# Output file: sample.target_genome.filter.chrom.tsv
-
-# Step 4b. control_plots.R - From positions bed file generates pdf file with plots of pairwise distances, coverage of postions on every chromosome. Used for control libraries.
-# Runs if output file does not exist
-# Output file: sample.target_genome.filter.chrom.pdf
-
-# Step 5. regions_dnacopy.R - From positions bed file generates bed-like file with regions and their statistics and pdf plot for all chromosomes listed in .sizes file. 
-# Runs if output files do not exist
+# Step 5. regions_dnacopy.R - classifies chromosomes listed in .sizes file based on distances between consecutive read positions
 # Requires R::DNAcopy (installation commands available in script)
-# Other parameters: pdf_width pdf_height
-# Output files: sample.target_genome.filter.reg.tsv, sample.target_genome.filter.reg.pdf
-
-# Step 6. sample_stats.py - Calculates basic sample stats: reads, aligned reads etc.
-# Runs if output file does not exist
-# Output file: sample.stats.txt
+# Output files: sample.target_genome.reg.tsv, sample.target_genome.reg.pdf
 
 # Other scripts
 
-# After manual inspection and correction of regions called you can re-calculate stats for them
-# ../exec/basic_stats.py sample.target_genome.filter.bam sample.target_genome.corrected.reg.bed sizes_file
-
 # You also can run pipeline for variant calling with GATK HaplotypeCaller and annotation with snpEff for these regions
 # vca_reg.py vca_reg.conf
-
-# Two sets of regions (e.g. from biological replicates) can be compared in order to identify regions with differing mean pd
-# ../exec/reg_compare.py regs1.tsv regs2.tsv
 
 # Input for RepeatExplorer (interleaved fasta with minimum read length 18 - word size) can be generated
 # sample.[FR].ca.fastq files are used as input

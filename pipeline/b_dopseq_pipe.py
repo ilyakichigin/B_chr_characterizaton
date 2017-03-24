@@ -89,11 +89,14 @@ if __name__ == '__main__':
         if conf['aln'] == 'bt2':
             aligner_path = conf['bowtie2_path']
             aligner_args = conf['bowtie2_args']
+        elif conf['aln'] == 'bwa':
+            aligner_path = conf['bwa_path']
+            aligner_args = conf['bwa_args']
         elif conf['aln'] == 'bbm':
             aligner = conf['bbmap_path']
             aligner_args = conf['bbmap_args']
         else:
-            raise Exception('Invalid aligner!')
+            raise Exception('Invalid aligner %s!' % conf['aln'])
         for g in ('target', 'contam'):
             fa_args = argparse.Namespace(fastq_F_file=fnames['f_trim_fq'], 
                 fastq_R_file=fnames['r_trim_fq'], aligner=conf['aln'], 
