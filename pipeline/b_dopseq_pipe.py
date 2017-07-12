@@ -44,8 +44,8 @@ def generate_filenames(sample, target_path, contam_path):
     names['target_index_prefix'] = '/'.join(target_path.split('/')[:-1]) + names['target_name']
     names['contam_name'] = contam_path.split('/')[-1].split('.')[0]
     names['contam_index_prefix'] = '/'.join(target_path.split('/')[:-1]) + names['contam_name']
-    names['target_sam'] = '.'.join([sample,names['target_name'],'sam'])
-    names['contam_sam'] = '.'.join([sample,names['contam_name'],'sam'])
+    names['target_bam'] = '.'.join([sample,names['target_name'],'bam'])
+    names['contam_bam'] = '.'.join([sample,names['contam_name'],'bam'])
     names['filtered_bam'] = '.'.join([sample,names['target_name'],'filter','bam'])
     names['pos_bed'] = '.'.join([sample,names['target_name'],'pos','bed'])
     names['reg_tsv'] = '.'.join([sample,names['target_name'],'reg','tsv'])
@@ -106,7 +106,7 @@ if __name__ == '__main__':
         sys.stderr.write('----Complete!----\n')
 
         sys.stderr.write('----contam_filter.py----\n') # filter contamination
-        cf_args = argparse.Namespace(target_sam=fnames['target_sam'], contam_sam=fnames['contam_sam'],
+        cf_args = argparse.Namespace(target_bam=fnames['target_bam'], contam_bam=fnames['contam_bam'],
                                      min_quality=conf['min_mapq'], dry_run = args.dry_run)
         contam_filter.main(cf_args)
         sys.stderr.write('----Complete!----\n')

@@ -17,10 +17,10 @@ def parse_command_line_arguments():
                     (tested on v.0.8.1 and v.0.1.19-44428cd, respectively)
                     """
                     )
-    parser.add_argument("target_sam",
-                        help="SAM alignment to target genome")
-    parser.add_argument("contam_sam",
-                        help="SAM alignment to contamination genome")
+    parser.add_argument("target_bam",
+                        help="BAM alignment to target genome")
+    parser.add_argument("contam_bam",
+                        help="BAM alignment to contamination genome")
     parser.add_argument("-m", '--min_quality', default=20,
                         help="Minimum quality for filtered file. Default: 20.")
     parser.add_argument("-d", "--dry_run", action="store_true", 
@@ -31,30 +31,26 @@ def parse_command_line_arguments():
 
 def bam_sort(in_file, out_file, name_sort=False):
     samtools_rel = pysam.version.__samtools_version__[0] 
-    if samtools_rel == '0':
-        if name_sort:
-            pysam.sort('-n', in_file, out_file[:-4])
-        else:
-            pysam.sort(in_file, out_file[:-4])
-    elif samtools_rel == '1':
+    if samtools_rel == '1':
         if name_sort:
             pysam.sort('-n', '-T', '/tmp/bam_nsort', '-o', out_file, in_file)
         else:
             pysam.sort('-T', '/tmp/bam_sort', '-o', out_file, in_file)
+    elif samtools_rel == '0':
+        raise Exception('Unsupported samtools verion: %s. Please update to pysam with samtools version 1.*.*.' % (pysam.version.__samtools_version__[0]))
     else:
-        raise Exception('Invalid samtools verion: %s. Valid versions 0.*.*, 1.*.*.' % (pysam.version.__samtools_version__[0]))
+        raise Exception('Unrecognized samtools verion: %s. Supported versions: 1.*.*.' % (pysam.version.__samtools_version__[0]))
 
 def main(args):
 
     # output: filtered bam alignment
-    filter_bam = args.target_sam[:-4] + '.filter.bam'
+    filter_bam = args.target_bam[:-4] + '.filter.bam'
     if not os.path.isfile(filter_bam):
         if args.dry_run:
-            sys.stderr.write('Using pysam version %s with samtools version %s.\nInput files: %s %s Output file: %s\n' 
-                % (pysam.__version__, pysam.version.__samtools_version__, 
-                    args.target_sam, args.contam_sam, filter_bam))
+            sys.stderr.write('%s -m %d %s %s > %s\n' 
+                % (os.path.realpath(__file__), args.min_quality, args.target_bam, args.contam_bam, filter_bam))
         else:
-            sys.stderr.write('Target: %s. Contamination: %s.\n'%(args.target_sam, args.contam_sam))
+            sys.stderr.write('Target: %s. Contamination: %s.\n'%(args.target_sam, args.contam_bam))
             min_qual = int(args.min_quality)
             
             # name-sort inputs
@@ -64,8 +60,8 @@ def main(args):
             cname = c.name
             t.close()
             c.close()
-            bam_sort(args.target_sam, tname, name_sort=True)
-            bam_sort(args.contam_sam, cname, name_sort=True)
+            bam_sort(args.target_bam, tname, name_sort=True)
+            bam_sort(args.contam_bam, cname, name_sort=True)
 
             # filter to the intermediate output
             f = tempfile.NamedTemporaryFile(suffix = '_f.bam', delete=False)

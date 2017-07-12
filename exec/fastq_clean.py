@@ -39,6 +39,10 @@ def parse_command_line_arguments():
     return parser.parse_args()
 
 def main(args):
+
+    assert os.path.isfile(args.fastq_F_file)
+    if args.fastq_R_file:
+        assert os.path.isfile(args.fastq_R_file)
     
     if args.fastq_R_file == None:
         reads = [args.fastq_F_file]

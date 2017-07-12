@@ -10,20 +10,19 @@
 sample: VVUB
 
 # path to file with forward reads
-fastq_F_file: test.F.fastq
+fastq_F_file: ../examples/test.F.fastq
 # path to file with reverse reads, comment out in case of single-end reads
-fastq_R_file: test.R.fastq 
+fastq_R_file: ../examples/test.R.fastq 
 
 # genomes
 # path to fasta file of target genome
 target_genome: /genome/canFam3/canFam3.masked.fa 
-# path to fasta file of contamination genome (human in our case)
-# commenting out contam_genome disables alignment to contamination genome and contam_filter (Step 3.)
+# Optional: path to fasta file of contamination genome (human in our case)
 contam_genome: /genome/hg19/hg19.fa 
 # note that for bowtie2 and bwa index files are expected in the same folder with proper basenames: 
-# e.g. canFam3 for canFam3.masked.fasta, hg19 for hg19.fa 
+# e.g. for canFam3.masked.fasta, canFam3 and canFam3.masked.fasta are valid
 
-# read trimming
+# read trimming, includes Illumina adapter removal
 cutadapt_path: cutadapt # do not use '~' in path
 # amplification protocol - used to remove specific primers. Possible values: dop, wga, none.
 ampl: wga 
@@ -33,7 +32,7 @@ cutadapt_args: "--trim-n --minimum-length 20"
 
 # read mapping
 # Aligner to use. Possible values: bt2 (for bowtie2), bwa, bbm (for bbmap)
-aln: bt2 
+aln: bwa 
 bowtie2_path: bowtie2 # do not use '~' in path
 # Additional parameters for bowtie2 specified as quoted string
 bowtie2_args: "-p 1 --very-sensitive-local" 
@@ -50,7 +49,7 @@ bbmap_args: "threads=1"
 min_mapq: 20 
 
 # region calling
-# tab-separated file with chromosomes and their sizes.
+# tab-separated file with chromosomes and their sizes, can be generated with "faSize -detailed" from Kent utils
 # only chromosomes listed in this file are processed in region calling
 sizes_file: ../examples/canFam3.sizes 
 
@@ -59,20 +58,18 @@ sizes_file: ../examples/canFam3.sizes
 # Step 1. fastq_clean.py - removes residual Illumina adapters and primers from input fastq files
 # Output files: sample.ca.R1.fastq(.gz), [sample.ca.R2.fastq(.gz),] sample.ca.log
 
-# Step 2. fastq_aln.py - aligns trimmed reads to target and contamination genomes using bowtie2, bwa or bbmap.
-# Output files: sample.target_genome.sam, sample.target_genome.bt2.log, [sample.contam_genome.sam, sample.contam_genome.bt2.log]
+# Step 2. fastq_aln.py - aligns trimmed reads to target and contamination genomes using bowtie2, bwa or bbmap. Sorts and converts results to bam.
+# Output files: sample.target_genome.bam, sample.target_genome.bt2.log, [sample.contam_genome.bam, sample.contam_genome.bt2.log]
 
 # Step 3. contam_filter.py - Removes contamination reads by comparing MAPQs to target and cotamination genomes. Outputs sorted and indexed bams.
-# Requires pysam
 # Output file: sample.target_genome.filter.bam
 
 # Step 4. bam_to_bed.py - creates bed file with non-overlapping positions of reads in target genome
-# Input files to start from this step: sample.target_genome.filter.bam
-# Other parameters: --path_to_bedtools
+# Input file to start from this step: sample.target_genome.filter.bam
 # Output file: sample.target_genome.filter.pos.bed
 
 # Step 5. regions_dnacopy.R - classifies chromosomes listed in .sizes file based on distances between consecutive read positions
-# Requires R::DNAcopy (installation commands available in script)
+# Input file to start from this step: sample.target_genome.filter.pos.bed
 # Output files: sample.target_genome.reg.tsv, sample.target_genome.reg.pdf
 
 # Other scripts
