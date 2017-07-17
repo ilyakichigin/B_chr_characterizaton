@@ -56,27 +56,33 @@ sizes_file: ../examples/canFam3.sizes
 ### Pipeline step-by-step
 
 # Step 1. fastq_clean.py - removes residual Illumina adapters and primers from input fastq files
-# Output files: sample.ca.R1.fastq(.gz), [sample.ca.R2.fastq(.gz),] sample.ca.log
+# Output files: sample.ca.R1.fastq.gz [sample.ca.R2.fastq.gz] sample.ca.log
 
-# Step 2. fastq_aln.py - aligns trimmed reads to target and contamination genomes using bowtie2, bwa or bbmap. Sorts and converts results to bam.
-# Output files: sample.target_genome.bam, sample.target_genome.bt2.log, [sample.contam_genome.bam, sample.contam_genome.bt2.log]
+# Step 2. fastq_aln.py - aligns trimmed reads to target (tgt) and contamination (cnt) genomes using bowtie2, bwa or bbmap. Sorts and converts results to bam.
+# Output files: sample.tgt.bam sample.tgt.log [sample.cnt.bam sample.cnt.log]
 
 # Step 3. contam_filter.py - Removes contamination reads by comparing MAPQs to target and cotamination genomes. Outputs sorted and indexed bams.
-# Output file: sample.target_genome.filter.bam
+# Output file: sample.tgt.filter.bam
 
 # Step 4. bam_to_bed.py - creates bed file with non-overlapping positions of reads in target genome
-# Input file to start from this step: sample.target_genome.filter.bam
-# Output file: sample.target_genome.filter.pos.bed
+# Input file to start from this step: sample.tgt.filter.bam
+# Output file: sample.tgt.pos.bed
 
 # Step 5. regions_dnacopy.R - classifies chromosomes listed in .sizes file based on distances between consecutive read positions
-# Input file to start from this step: sample.target_genome.filter.pos.bed
-# Output files: sample.target_genome.reg.tsv, sample.target_genome.reg.pdf
+# Input file to start from this step: sample.tgt.pos.bed
+# Output files: sample.tgt.reg.tsv sample.tgt.reg.pdf
 
-# Other scripts
+# Step 6. sample_stats.py - collects statistics for the sample
+# Output file: sample.stats.txt
+
+### Other scripts
 
 # You also can run pipeline for variant calling with GATK HaplotypeCaller and annotation with snpEff for these regions
-# vca_reg.py vca_reg.conf
+# vca_reg.py vca_reg.yaml
 
 # Input for RepeatExplorer (interleaved fasta with minimum read length 18 - word size) can be generated
 # sample.[FR].ca.fastq files are used as input
 # ../exec/fastq_repexpl.py [-r] sample
+
+# Sample statistics can be updated for verified regions present on chromosomes
+# ../exec/sample_stats.py -t verified_regs.bed -o sample.reg_stats.txt sample tgt
