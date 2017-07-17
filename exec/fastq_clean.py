@@ -57,7 +57,7 @@ def main(args):
         raise Exception('Improper read naming:\n%s\nValid file extensions are .fastq for \
          uncompressed and .fastq.gz for gzipped reads' % (args.fastq_F_file, args.fastq_R_file))
     '''
-    ca_reads = [args.sample_name + '.ca.R1.fastq', args.sample_name + '.ca.R2.fastq']
+    ca_reads = [args.sample_name + '.ca.R1.fastq.gz', args.sample_name + '.ca.R2.fastq.gz']
     log_file = args.sample_name + '.ca.log'
     if not os.path.isfile(ca_reads[0]):
         # custom parameters
