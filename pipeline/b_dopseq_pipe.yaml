@@ -6,7 +6,7 @@
 
 ### Assignable parameters
 
-# sample name - used as prefix for output files
+# sample name - used as prefix for output files. Allowed characters - letters, digits, underscore.
 sample: VVUB
 
 # path to file with forward reads
