@@ -107,7 +107,7 @@ if __name__ == '__main__':
 
         sys.stderr.write('----contam_filter.py----\n') # filter contamination
         cf_args = argparse.Namespace(target_bam=fnames['target_bam'], contam_bam=fnames['contam_bam'],
-                                     min_quality=conf['min_mapq'], dry_run = args.dry_run)
+                                     min_quality=conf['min_mapq'], min_length=conf['min_len'], dry_run = args.dry_run)
         contam_filter.main(cf_args)
         sys.stderr.write('----Complete!----\n')
         '''
@@ -143,7 +143,7 @@ if __name__ == '__main__':
         sys.stderr.write('Writing stats to %s\n' % fnames['stat_file'])
         ss_args = argparse.Namespace(sample=conf['sample'],genome=fnames['target_name'],
                             f_reads=conf['fastq_F_file'], r_reads=conf['fastq_R_file'], 
-                            target_regions=None, output=None)
+                            target_regions=None, output=None, dry_run = args.dry_run)
         sample_stats.main(ss_args)
     else:
         sys.stderr.write('%s statistics file exist. OK!\n' % fnames['stat_file'])

@@ -45,8 +45,8 @@ bbmap_path: bbmap.sh # do not use '~' in path
 bbmap_args: "threads=1" 
 
 # read filtering
-# minimum mapping quality for mapped read retention. Works both with and without contamination filtering.
-min_mapq: 20 
+min_mapq: 20 # minimum mapping quality for mapped read retention
+min_len: 20 # minimum alignment length for mapped read retention
 
 # region calling
 # tab-separated file with chromosomes and their sizes, can be generated with "faSize -detailed" from Kent utils

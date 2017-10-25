@@ -23,6 +23,8 @@ def parse_command_line_arguments():
                         help="BAM alignment to contamination genome")
     parser.add_argument("-m", '--min_quality', default=20,
                         help="Minimum quality for filtered file. Default: 20.")
+    parser.add_argument("-l", '--min_length', default=20,
+                        help="Minimum alignment length for filtered file. Default: 20 bp.")
     parser.add_argument("-d", "--dry_run", action="store_true", 
                         default=False, help="print out commands and exit")
 
@@ -41,15 +43,15 @@ def bam_sort(in_file, out_file, name_sort=False):
     else:
         raise Exception('Unrecognized samtools verion: %s. Supported versions: 1.*.*.' % (pysam.version.__samtools_version__[0]))
 
-def compare_mapqs(treads, creads, filter_file, min_qual, i, j):
+def compare_mapqs(treads, creads, filter_file, min_qual, min_len, i, j):
     if sum([x.mapping_quality for x in treads])/len(treads) >= sum([x.mapping_quality for x in creads])/len(creads):
         for read in treads:
-            if read.mapping_quality >= min_qual: # filter
+            if read.mapping_quality >= min_qual and read.reference_length >= min_len: # filter
                 i += 1
                 filter_file.write(read)
     else:
         for read in creads:
-            if read.mapping_quality >= min_qual: # contam
+            if read.mapping_quality >= min_qual and read.reference_length >= min_len: # contam
                 j += 1
 
     return (i, j)
@@ -60,10 +62,11 @@ def main(args):
     log_file = args.target_bam[:-4] + '.filter.log'
     if not os.path.isfile(filter_bam):
         sys.stderr.write('%s -m %d %s %s > %s 2> %s\n' 
-                % (os.path.realpath(__file__), args.min_quality, args.target_bam, args.contam_bam, filter_bam, log_file))
+                % (os.path.realpath(__file__), args.min_quality, 
+                args.target_bam, args.contam_bam, filter_bam, log_file))
         if not args.dry_run:
-            #sys.stderr.write('Target: %s. Contamination: %s.\n'%(args.target_bam, args.contam_bam))
             min_qual = int(args.min_quality)
+            min_len = int(args.min_length)
             
             # name-sort inputs
             t = tempfile.NamedTemporaryFile(suffix = '_t.bam', delete=False)
@@ -102,7 +105,7 @@ def main(args):
                                     creads.append(cread)
                             else:
                                 break
-                        (i, j) = compare_mapqs(treads, creads, filter_file, min_qual, i, j)
+                        (i, j) = compare_mapqs(treads, creads, filter_file, min_qual, min_len, i, j)
                         treads = [tread]
                         creads = [cread]
                         prev_query = tread.query_name
@@ -112,13 +115,13 @@ def main(args):
                         creads.append(cread)
                     else:
                         raise Exception('%s file has read %s not present in %s' % (args.contam_bam, cread.query_name, args.target_bam))
-                (i, j) = compare_mapqs(treads, creads, filter_file, min_qual, i, j)
+                (i, j) = compare_mapqs(treads, creads, filter_file, min_qual, min_len, i, j)
                 filter_file.close()
                 with open(log_file, 'w') as outfile:
                     outfile.write('Target aligned fragments:\t%d\n' % (tf))
                     outfile.write('Contam aligned fragments:\t%d\n' % (cf))
-                    outfile.write('Contamination Q%d fragments:\t%d\n' % (min_qual, j))
-                    outfile.write('Filtered Q%d fragments:\t%d\n' % (min_qual, i))
+                    outfile.write('Contamination Q%d fragments (>=%d bp):\t%d\n' % (min_qual, min_len, j))
+                    outfile.write('Filtered Q%d fragments (>=%d bp):\t%d\n' % (min_qual, min_len, i))
                 #sys.stderr.write('%d init target fragments %d init contam fragments %d filtered %d contam\n' % (tf, cf, i, j))
 
             # coordinate-sort output
