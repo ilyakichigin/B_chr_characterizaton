@@ -14,7 +14,7 @@ Dependencies:
 
 1. [cutadapt](http://cutadapt.readthedocs.io/en/stable/) (tested on v.1.8.3)
 
-2. [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) (tested on v.2.1.0, 2.2.4)
+2. [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) (tested on v.2.1.0, 2.2.4) or [bwa](https://sourceforge.net/projects/bio-bwa/files/) (tested on v.0.7.12)
 
 3. [pysam](http://pysam.readthedocs.io/en/latest/api.html) python package (tested on v.0.8.1)
 
