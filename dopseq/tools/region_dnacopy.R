@@ -23,11 +23,19 @@ library(DNAcopy)
 args <- commandArgs(trailingOnly = TRUE)
 pos_file <- args[1] # bed file with positions, additional column with coverage
 size_file <- args[2] # file with chromosome sizes
-if (length(args) == 4) { # pdf size
+if (length(args) == 6) { # pdf size
     pdf_width <- as.numeric(args[3])
-    pdf_height <- as.numeric(args[4])} else {
+    pdf_height <- as.numeric(args[4])
+    tsv_out <- args[5]
+    pdf_out <- args[6]} else {
     pdf_width <- 20
-    pdf_height <- 20}
+    pdf_height <- 20
+    basename <- unlist(strsplit(pos_file, '/')) # save pdf to current folder
+    basename <- basename[length(basename)]
+    basename <- substr(basename,1,nchar(basename)-8) # remove '.pos.bed' from filename
+    tsv_out <- paste(basename,'.reg.tsv',sep='')
+    pdf_out <- paste(basename,'.reg.pdf',sep='')
+    }
 plot.type <- 's' # 'w' for whole genome in one picture
 left_dist <- TRUE # Calculate distance to left position. Correction for right dist not implemented.
 draw_plot <- TRUE # FALSE to skip plotting
@@ -77,7 +85,7 @@ if (draw_plot) {
                     data.type = 'logratio',sampleid = basename)
   if (smooth) {CNA.object <- smooth.CNA(CNA.object)}
   segment.CNA.object <- segment(CNA.object, verbose=1)
-  pdf(paste(basename,'.reg.pdf',sep=''), width = pdf_width, height = pdf_height)
+  pdf(pdf_out, width = pdf_width, height = pdf_height)
   plot(segment.CNA.object, plot.type=plot.type, xmaploc=T,  
        ylim=c(0,max(CNA.object[,3]))) # 'w' type for all chromosomes
   dev.off()
@@ -165,5 +173,5 @@ corr_out_regions <- corr_out_regions[c('chrom','reg.start','reg.end','reg.size',
                                        'cov.mean','cov.sd','pos.bp.mean','pos.bp.total','pos.cov','chrom.size','log10.mean')]
 
 # Write tsv file
-write.table(corr_out_regions,file=paste(basename,'.reg.tsv',sep=''),quote=F,sep='\t',
+write.table(corr_out_regions,file=tsv_out,quote=F,sep='\t',
             row.names=F,col.names=T)

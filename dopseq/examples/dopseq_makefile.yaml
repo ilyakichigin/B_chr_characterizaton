@@ -1,0 +1,132 @@
+# This document contains links to data and parameter setting for dopseq -
+# a pipeline for inference of chromosomal regions from isolated chromosome
+# high-throughput sequencing data. After that, pipeline steps are listed
+# together with their output files.
+
+
+### DATA AND PARAMETERS
+
+
+### Sample data
+samples:
+  # Sample name - used as prefix for output files.
+  # Allowed characters - letters, digits, underscore.
+  Sample_name1:
+    # Path to file with forward reads.
+    fastq_F_file: /some/path/S1.R1.fastq.gz
+    # Path to file with reverse reads.
+    fastq_R_file: /some/path/S1.R2.fastq.gz
+  # Another sample name. Samples can be added or removed.
+  Sample_name2:
+    # Path to file with single-end reads.
+    fastq_F_file: /some/path/S2.R1.fastq.gz
+
+
+### Genome data
+# Target genome unpacked fasta file path.
+target_genome: /some/path/genome1.fa
+
+# Contamination genome fasta file path. 
+# Used for alignment filtering by comparing mapping qualities of all reads.
+# Remove or comment out if no contamination filtering is needed. Note that
+# "min_mapq" and "min_len" filters (see below) will still be applied.
+contam_genome: /some/path/genome2.fa
+
+
+### Read trimming
+# Uncomment to use alterative path to cutadapt executable.
+#cutadapt_path: /some/path/cutadapt
+# Amplification protocol - used to remove specific primers.
+# Currently implemented values are: "dop" (DOP-PCR MW6 primer), "wga", "none"
+# - no additional trimming.
+ampl: wga
+
+# Logical: trim Illumina universal adapter. Set to "no" if other sequencing
+# platform was used
+trim_illumina: yes
+
+# Additional parameters for cutadapt specified as quoted string. See cutadapt
+# manual (http://cutadapt.readthedocs.io/en/stable/guide.html) for acceptable
+# arguments. Commonly used arguments - trim trailing Ns ("--trim-n"), remove
+# sequences shorter than 20 bp ("--minimum-length 20"). For WGA you may want to
+# increase error toleance with e.g. "-e 0.25"
+cutadapt_args: "--trim-n --minimum-length 20"
+
+
+### Read mapping
+# Aligner to use. Currently implemented values: "bt2" (bowtie2), "bwa" (BWA).
+aln: bwa
+
+# Uncomment to use alterative path to bowtie2 executable.
+#bowtie2_path: /some/path/bowtie2
+
+# Additional parameters for bowtie2 specified as quoted string. See manual at
+# http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml.
+bowtie2_args: "-p 1 --very-sensitive-local"
+
+# Uncomment to use alterative path to bwa executable.
+#bwa_path: /some/path/bwa
+
+# Additional parameters for BWA specified as quoted string. See manual at
+# http://bio-bwa.sourceforge.net/bwa.shtml.
+bwa_args: "mem -t 1"
+
+
+### Read filtering
+# Filters applied even without contamination removal.
+# Minimum mapping quality for mapped fragment retention.
+min_mapq: 20
+
+# Minimum alignment length for mapped fragment retention.
+min_len: 20
+
+
+### Region calling
+# Tab-separated file with chromosomes and their sizes, can be generated using
+# "-s" option of the dopseq_pipeline or with "faSize -detailed" from Kent utils.
+# Only chromosomes listed in this file are processed in region calling. 
+# Specify up to 42 chromosomes to generate plot.
+sizes_file: genome1.sizes
+
+# Plot dimensions. Default settings work well with up to 6*4=24 and 7*6=42
+# chromosomes. Note that plot will not be generated if there are over 42
+# chromosomes in sizes file (parameter set in region_dnacopy.R)
+plot_height: 20
+plot_width: 20
+
+
+### RepeatExplorer input
+# Logical: generate interleaved fasta used as input for RepeatExplorer
+fastq_repexpl: yes
+
+
+### Pipeline step-by-step
+
+# Step 1. dopseq.tools.fastq_clean - remove residual Illumina adapters and
+# primers from input fastq files.
+# Output files: sample.ca.R1.fastq.gz [sample.ca.R2.fastq.gz] sample.ca.log
+
+# Step 2. dopseq.tools.fastq_aln - align trimmed reads to target and
+# contamination genomes using bowtie2 or bwa. Sort and convert to bam.
+# Output files: sample.genome1.bam sample.genome1.log [sample.genome2.bam
+# sample.genome2.log]
+
+# Step 3. dopseq.tools.contam_filter - remove contamination reads by comparing
+# MAPQs to target and cotamination genomes. Sort output.
+# Output file: sample.genome1.filter.bam
+
+# Step 4. dopseq.tools.bam_to_bed - create bed file with non-overlapping
+# positions of reads in target genome. Analysis can be started from this step
+# if sample.genome1.filter.bam is present in current directory.
+# Output file: sample.genome1.pos.bed
+
+# Step 5. dopseq.tools.regions_dnacopy.R - classify chromosomes listed in
+# genome1.sizes file based on distances between consecutive read positions.
+# Output files: sample.genome1.reg.tsv sample.genome1.reg.pdf
+
+# Step 6. dopseq.tools.sample_stats - collect statistics.
+# Output file: sample.stats.txt
+
+# Step 7 (optional). dopseq.tools.fastq_repexpl - convert trimmed reads to
+# the interleaved fasta suitable as RepeatExplorer clustering input.
+# Output file: sample.ca.re.fasta

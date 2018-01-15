@@ -1,45 +1,45 @@
 # Introduction
 
-DOPseq_analyzer is a a set of tools for processing of sequencing data of isolated (flow sorted or microdissected) chromosomes amplified with Degenerate Oligonucleotide Primed PCR (DOP-PCR) or WGA.
+DOPseq_analyzer is a set of tools for processing of high-throughput sequencing data generated from isolated (flow sorted or microdissected) chromosomes.
 
 Currently, three pipelines are implemented: 
 
-1. Analysis of B chromosomes (pipeline/b_dopseq_pipe.py) includes read trimming, alignment to reference genome, contamination filtering, region calling and statistics calculation.
-2. Analysis of anole microchromosomes (anolis/pipeline/anolis_dopseq_pipe.py) includes similar steps. It is optimized for reference genomes consisting of scaffolds and has a possibility to handle WGA libraries. Maintained by ilyakichigin.
-3. Variant calling for validated chromosome-specific regions with GATK HaplotypeCaller (pipeline/vca_reg.py).
+1. Chromosomal region prediction pipeline (`dopseq_pipeline`) includes read trimming, alignment to reference genome, contamination filtering, region calling and statistics calculation.
+2. Variant calling and annotation pipeline for validated chromosome-specific regions (`variation_pipeline`).
+3. Analysis of anole microchromosomes (`anolis/pipeline/anolis_dopseq_pipe.py`) includes steps similar to dopseq_pipeline. It is optimized for reference genomes consisting of scaffolds and has a possibility to handle WGA libraries. This pipeline is not included in the pipeline installation and can be called only directly. Maintained by ilyakichigin.
 
 # Installation
 
-Dependencies:
+Dependencies you should install yourself:
 
-1. [cutadapt](http://cutadapt.readthedocs.io/en/stable/) (tested on v.1.8.3)
+1. [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) (tested on v.2.1.0, 2.2.4) or [bwa](https://sourceforge.net/projects/bio-bwa/files/) (tested on v.0.7.12)
 
-2. [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) (tested on v.2.1.0, 2.2.4) or [bwa](https://sourceforge.net/projects/bio-bwa/files/) (tested on v.0.7.12)
+2. [bedtools](http://bedtools.readthedocs.io/en/latest/) (tested on v.2.17.0 and v.2.24.0)
 
-3. [pysam](http://pysam.readthedocs.io/en/latest/api.html) python package (tested on v.0.8.1)
+3. [DNAcopy](https://bioconductor.org/packages/release/bioc/html/DNAcopy.html) R (Bioconductor) package 
 
-4. [bedtools](http://bedtools.readthedocs.io/en/latest/) (tested on v.2.17.0 and v.2.24.0)
+4. (Optional - for subsequent variant calling and annotation) [GATK 4](https://software.broadinstitute.org/gatk/download/beta) (tested on beta.1), Picard, samtools, [snpEff](http://snpeff.sourceforge.net/) (tested on v.3.3.0 and v.4.3t)
 
-5. [DNAcopy](https://bioconductor.org/packages/release/bioc/html/DNAcopy.html) R (Bioconductor) package 
-
-6. (Optional - for subsequent variant calling and annotation) [GATK 4](https://software.broadinstitute.org/gatk/download/beta) (tested on beta.1), [snpEff](http://snpeff.sourceforge.net/) (tested on v.3.3.0)
-
-
-After dependencies are installed, individual scrips and pipelines can be used. Note that internal folder structure must be preserved so that b_dopseq_pipe.py could find executable scripts. 
+Then, download the pipeline, go to the folder, and run pip install. Python packages cutadapt, pysam and will be installed automatically.
+```
+git clone https://github.com/ilyakichigin/DOPseq_analyzer.git
+cd DOPseq_analyzer
+pip install --user .
+```
 
 # Usage 
 
 Pipeline for chromosome region identification can be called with the command:
 ```
-/some/folder/DOPseq_analyzer/pipeline/b_dopseq_pipe.py [-d] b_dopseq_pipe.yaml
+dopseq_pipeline [-c|-d|-s] dopseq_makefile.yaml
 ```
-Details on inputs, outputs and assignable parameters can be found in example `b_dopseq_pipe.yaml` config file.   Enabling dry run `-d` option provides command listing and checks if all the input files are present. 
+Makefile example can be found at `examples/dopseq_makefile.yaml` in this repository or copied to your working directory by running `dopseq_pipeline -c my_makefile.yaml`. Use this file to specify your input data and parameters. Use `dopseq_pipeline -s dopseq_makefile.yaml > genome.sizes` to generate tab-separated file listing chromosomes and their sizes for the reference genome specified in the makefile. Dry run `-d` option provides command listing and checks if all the input files are present. After that, pipeline can be run with `dopseq_pipeline my_makefile.yaml`
 
-Briefly, this pipeline trims and aligns reads to the reference genome (and optonally potential contaminant genome), filters the alignment, and classifies selected chromosomes of the reference genome based on mean distances between mapped read positions. Regions with lower means can be further interpreted as specific to the isolated chromosomes. Note that these regions cannot be used 'as is' and require manual inspection and correction.
+Pipeline steps and output files are described in the example makefile. Briefly, this pipeline trims and aligns reads to the reference genome (and optonally contaminant genome, human being most obvious for mammalian chromosome samples), filters the alignment, and classifies selected chromosomes of the reference genome based on mean distances between mapped read positions. Regions with lower means can be further interpreted as present on the isolated chromosomes. Note that these regions cannot be used 'as is' and require manual inspection and correction.
 
 
 Pipeline for variant calling and annotation can be called similarly:
 ```
-/some/folder/DOPseq_analyzer/pipeline/vca_reg.py [-d] vca_reg.yaml
+variation_pipeline [-d|-c] variation_makefile.yaml
 ```
-Currently, this pipeline simply runs GATK HaplotypeCaller and snpEff annotation with default settings for a given set of regions (presumably present on the chromosome of interest). 
+Currently, this pipeline runs GATK HaplotypeCaller and snpEff annotation with default settings for a given set of genome regions (presumably present on the chromosome of interest). It also creates a file with summary, per region, and per gene statistics. 

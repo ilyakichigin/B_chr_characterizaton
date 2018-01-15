@@ -1,0 +1,3 @@
+include dopseq/examples/dopseq_makefile.yaml
+include dopseq/examples/variation_makefile.yaml
+include dopseq/tools/region_dnacopy.R

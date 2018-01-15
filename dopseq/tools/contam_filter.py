@@ -1,0 +1,211 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import pysam
+import argparse
+
+from dopseq.tools import utils
+
+def parse_command_line_arguments():
+
+    parser = argparse.ArgumentParser(description=    
+                    """
+                    Remove contamination reads using alignments to target and 
+                    cotamination genomes. Filtering strategy - compare mean
+                    mapping qualities of all aligned segments.
+                    """
+                    )
+    parser.add_argument('target_bam',
+                        help='BAM alignment to target genome')
+    parser.add_argument('contam_bam',
+                        help='BAM alignment to contamination genome')
+    parser.add_argument('-o', '--out_bam', default='test.bam', 
+                        help='Output BAM file name')
+    parser.add_argument('-s', '--stat_file', default='test.log', 
+                        help='Statistics file name')
+    parser.add_argument('-q', '--min_quality', 
+                        type=int, default=20,
+                        help='Minimum quality for filtered fragment. '
+                             'Default: 20.')
+    parser.add_argument('-l', '--min_length', 
+                        type=int, default=20,
+                        help='Minimum alignment length for each aligned '
+                             'fragment. Default: 20 bp.')
+    parser.add_argument('-u', '--keep_unmapped', 
+                        action='store_true', default=False,
+                        help='Keep unmapped reads, min_quality and min_length '
+                             ' be igrored. Note that even with "-q 0 -l 0" '
+                             'unmapped reads will be discarded')
+    parser.add_argument('-d', '--dry_run', 
+                        action='store_true', default=False, 
+                        help='Print out commands and exit')
+
+    return parser.parse_args()
+
+
+def fragment_pass_filters(aln, min_qual, min_len, keep_unmapped=False):
+    """Return True if read passes filters
+
+    min_qual filter is passed if fragment mappinq quality is higher or equal
+    than threshold
+    
+    min_len filter is passed if fragment alignment length on reference is
+    higher or equal than threshold
+
+    keep_unmapped is always passed if set to True
+    """
+    if aln.mapping_quality >= min_qual and aln.reference_length >= min_len:
+        return True
+    elif keep_unmapped:
+        return True
+    else:
+        return False
+
+
+def filter_alns(t_alns, c_alns, f_file,
+                q_count, r_count,
+                min_qual=20, min_len=20, 
+                keep_unmapped=False):
+    """Given two pysam alignedSegment lists t_alns and c_alns, from t_alns 
+    remove fragments with higher quality alignments in c c_alns based on
+    mapping quality, apply filters or keep all sequences, 
+    write filtered alignments to open f_file, 
+    return tuple of:
+    -q_count - number of alignments removed due to quality filter
+    -r_count - number of alignments removed as contamination
+
+    Note that read might be represented by multiple aligned fragments in case
+    of BWA MEM alignment.
+    
+    mapq filter is passed if mean mapping quality among aligned fragments is
+    higher or equal in target compared to contamination alignment.
+    """
+    
+    def mean_mapq(alns):
+        """Return mean mapping quality for input alignment list
+        """
+        sum_mapq = sum([x.mapping_quality for x in alns])
+        return sum_mapq / float(len(alns))
+
+    t_mean_mapq = mean_mapq(t_alns)
+    c_mean_mapq = mean_mapq(c_alns)
+    if t_mean_mapq >= c_mean_mapq:
+        for aln in t_alns:
+            if fragment_pass_filters(aln, min_qual, min_qual, 
+                                     keep_unmapped):
+                f_file.write(aln)
+            else:
+                q_count += 1
+    else:
+        r_count += len(t_alns)
+
+    return (q_count, r_count)
+
+def generate_filenames(t, c, o):
+
+    return {'t': t,
+            'c': c,
+            'o': o,
+            'tns': t + 'namesort.temp',
+            'cns': c + 'namesort.temp',
+            'ons': o + 'namesort.temp'
+            }
+
+def main(args):
+    
+    for f in (args.target_bam, args.contam_bam, args.out_bam):
+        assert f.endswith('.bam')
+    fn = generate_filenames(args.target_bam, args.contam_bam, args.out_bam)
+   
+    utils.bam_sort(fn['t'], fn['tns'], name_sort=True, verbose=False, 
+                   dry_run=args.dry_run)
+    utils.bam_sort(fn['c'], fn['cns'], name_sort=True, verbose=False, 
+                   dry_run=args.dry_run)
+
+    sys.stderr.write('Filtering %s using contaminant alignment %s\n' 
+                     % (args.target_bam, args.contam_bam))
+    if args.keep_unmapped:
+        sys.stderr.write('Unmapped reads retained in the resulting file\n')
+    else:
+        sys.stderr.write('Filtering options: min_qual = %d, min_len = %d\n'
+                         % (args.min_quality, args.min_length))
+    sys.stderr.write('Output: %s\n' % args.out_bam)
+
+    if not args.dry_run:
+        
+        with pysam.AlignmentFile(fn['tns']) as t_file, \
+             pysam.AlignmentFile(fn['cns']) as c_file, \
+             pysam.AlignmentFile(fn['ons'], 'wb', template=t_file) as f_file:
+            
+            t_alns = [t_file.next()]
+            c_alns = [c_file.next()]
+            if t_alns[0].query_name != c_alns[0].query_name:
+                        '%s and %s read conflict' % (t_alns[0].query_name,
+                                                     c_alns[0].query_name)
+            prev_query = ''
+            (t_count, c_count, q_count, r_count) = (1, 1, 0, 0)
+
+            for t_aln in t_file:
+                t_count += 1
+                if t_aln.query_name == prev_query: # accumulate targets
+                    t_alns.append(t_aln)
+                else: # analyze contam
+                    for c_aln in c_file:
+                        c_count += 1
+                        if c_aln.query_name == prev_query: # accumulate contam
+                                c_alns.append(c_aln)
+                        else:
+                            break
+                    (q_count, r_count) = filter_alns(t_alns, c_alns, f_file,
+                                            q_count, r_count,
+                                            min_qual=args.min_quality, 
+                                            min_len=args.min_length,
+                                            keep_unmapped=args.keep_unmapped)
+                    t_alns = [t_aln]
+                    c_alns = [c_aln]
+                    if t_aln.query_name != c_aln.query_name:
+                        '%s and %s read name conflict' % (t_aln.query_name,
+                                                          c_aln.query_name)
+                    prev_query = t_aln.query_name
+            for c_aln in c_file: # read the rest of contam after last target
+                c_count += 1
+                if c_aln.query_name == prev_query: # accumulate contam
+                    c_alns.append(c_aln)
+                else:
+                    raise ValueError('%s read name '
+                                     'conflict' % (c_aln.query_name))
+            (q_count, r_count) = filter_alns(t_alns, c_alns, f_file,
+                                    q_count, r_count,
+                                    min_qual=args.min_quality, 
+                                    min_len=args.min_length,
+                                    keep_unmapped=args.keep_unmapped)
+            
+            with open(args.stat_file, 'w') as log:
+                log.write('%d segments in target alignment\n' % (t_count))
+                log.write('%d segments in contamination '
+                          'alignment\n' % (c_count))
+                log.write('%d segments removed as belonging to contaminant '
+                              'genome\n' % (r_count))
+                if args.keep_unmapped:
+                    log.write('Unmapped segments retained in the output\n')
+                else:
+                    log.write('%d segments removed as not passing filters '
+                              '(minimum MAPQ %d, minimum alignment length %d,'
+                              ' discard unmapped)\n' % (q_count,
+                                                          args.min_quality,
+                                                          args.min_length))
+                log.write('%d segments retained after contamination removal '
+                          'and filtering\n' % (t_count - q_count - r_count))
+                
+    # coordinate-sort output
+    utils.bam_sort(fn['ons'], fn['o'], verbose=False, dry_run=args.dry_run)
+    
+    # clean-up
+    for f in (fn['tns'], fn['cns'], fn['ons']):
+                    if os.path.isfile(f):
+                        os.unlink(f)
+
+if __name__ == '__main__':
+    main(parse_command_line_arguments())
+    
