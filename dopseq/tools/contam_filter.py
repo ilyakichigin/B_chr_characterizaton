@@ -92,7 +92,7 @@ def filter_alns(t_alns, c_alns, f_file,
     c_mean_mapq = mean_mapq(c_alns)
     if t_mean_mapq >= c_mean_mapq:
         for aln in t_alns:
-            if fragment_pass_filters(aln, min_qual, min_qual, 
+            if fragment_pass_filters(aln, min_qual, min_len, 
                                      keep_unmapped):
                 f_file.write(aln)
             else:

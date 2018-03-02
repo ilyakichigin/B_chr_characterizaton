@@ -29,7 +29,7 @@ def parse_command_line_arguments():
     return parser.parse_args()
 
 
-def add_read_groups(bam, gatk, samtools, dry_run=True):
+def add_read_groups(bam, gatk, dry_run=True):
     """Add read group to BAM if not present"""
 
     rg_present = False
@@ -145,7 +145,6 @@ def main():
         if not os.path.isfile(fnames['md_bam']):
             add_read_groups(fnames['bam'],
                             conf['gatk_path'],
-                            conf['samtools_path'],
                             dry_run=args.dry_run)
             md_args = '%s MarkDuplicates -I %s -O %s -M %s' % (
                     conf['gatk_path'],
