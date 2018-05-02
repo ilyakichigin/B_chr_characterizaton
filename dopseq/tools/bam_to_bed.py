@@ -4,6 +4,7 @@
 import os
 import sys
 import argparse
+import pybedtools
 
 from dopseq.tools import utils
 
@@ -30,34 +31,42 @@ def parse_command_line_arguments():
     return parser.parse_args()
 
 
-def bedtools_release(bedtools_path, dry_run):
-    """Given path to bedtools return its release number 
-    (second number in version string)
-    """
-    bedtools_version_command = bedtools_path + ' --version'
-    bedtools_version = utils.run_command(bedtools_version_command, 
-                                         verbose=False,
-                                         dry_run=dry_run,
-                                         return_out=True)
-    bedtools_release = bedtools_version.split()[1].split('.')[1]
+# def bedtools_release(bedtools_path, dry_run):
+#     """Given path to bedtools return its release number 
+#     (second number in version string)
+#     """
+#     bedtools_version_command = bedtools_path + ' --version'
+#     bedtools_version = utils.run_command(bedtools_version_command, 
+#                                          verbose=False,
+#                                          dry_run=dry_run,
+#                                          return_out=True)
+#     bedtools_release = bedtools_version.split()[1].split('.')[1]
 
-    return int(bedtools_release)
+#     return int(bedtools_release)
 
 
 def main(args):
+
+    if args.dry_run:
+        sys.stderr.write('bedtools bamtobed -i %s | bedtools sort -i - | '
+                         'bedtools count -c 1 -o count > %s' % (args.in_bam,
+                                                                args.out_bed))
+    else:
+        s = pybedtools.BedTool(args.in_bam)
+        o = s.bamtobed().sort().merge(c=1, o='count').saveas(args.out_bed)
     
-    init_bed = utils.run_command('%s bamtobed -i %s' % (args.bedtools_path, 
-                                                        args.in_bam), 
-                                 verbose=True, dry_run=args.dry_run, 
-                                 return_out=True)
+    # init_bed = utils.run_command('%s bamtobed -i %s' % (args.bedtools_path, 
+    #                                                     args.in_bam), 
+    #                              verbose=True, dry_run=args.dry_run, 
+    #                              return_out=True)
 
-    sort_bed = utils.run_command('%s sort -i -' % args.bedtools_path, 
-                                 verbose=True, dry_run=args.dry_run, 
-                                 stdin = init_bed, return_out=True)
+    # sort_bed = utils.run_command('%s sort -i -' % args.bedtools_path, 
+    #                              verbose=True, dry_run=args.dry_run, 
+    #                              stdin = init_bed, return_out=True)
 
-    utils.run_command('%s merge -c 1 -o count -i -' % args.bedtools_path, 
-                      verbose=True, dry_run=args.dry_run, 
-                      stdin = sort_bed, outfile=args.out_bed)
+    # utils.run_command('%s merge -c 1 -o count -i -' % args.bedtools_path, 
+    #                   verbose=True, dry_run=args.dry_run, 
+    #                   stdin = sort_bed, outfile=args.out_bed)
 
     
 if __name__ == '__main__':

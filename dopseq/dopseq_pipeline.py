@@ -89,15 +89,15 @@ def main():
     with open(args.config_file) as conf_file:
         conf = safe_load(conf_file)
 
-    if args.sizes:
-        fai = conf['target_genome'] + '.fai'
+    # if args.sizes:
+    #     fai = conf['target_genome'] + '.fai'
 
-        if not os.path.isfile(fai):
-            faidx(conf['target_genome'])
-        with open(fai) as f:
-            for l in f:
-                print '\t'.join(l.split()[:2])
-        sys.exit(0)
+    #     if not os.path.isfile(fai):
+    #         faidx(conf['target_genome'])
+    #     with open(fai) as f:
+    #         for l in f:
+    #             print '\t'.join(l.split()[:2])
+    #     sys.exit(0)
 
     if args.dry_run:
         sys.stderr.write('This is a dry run. Only command listing '

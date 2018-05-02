@@ -58,7 +58,7 @@ def del_1000_sep(s):
 
 def main(args):
 
-    sample = args.pos_bed.split('.')[0]
+    sample = args.pos_bed.split('/')[0]
     if args.output is None:
         args.output = sample + '.stats.txt'    
 

@@ -9,7 +9,7 @@ setup(
 	author_email='alex@mcb.nsc.ru',
 	license='',
 	packages=find_packages(exclude=['anolis']),
-	install_requires=['pysam>=0.10.0', 'cutadapt>=1.8.3', 'pyyaml>=3.12'],
+	install_requires=['pysam>=0.10.0', 'cutadapt>=1.8.3', 'pyyaml>=3.12', 'pybedtools==0.7.10'],
     include_package_data=True,
 	entry_points={
         'console_scripts': [

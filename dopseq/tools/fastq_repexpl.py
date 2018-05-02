@@ -13,7 +13,7 @@ def parse_command_line_arguments():
                     RepeatExplorer with 'All sequence reads are paired' option.
                     """
                     )
-    parser.add_argument('f_fastq', 
+    parser.add_argument('f_fastq', # args.cutadapt_prefix?
                         help='file with forward reads')
     parser.add_argument('r_fastq', 
                         help='file with forward reads')
@@ -31,7 +31,7 @@ def main(args):
     """
     
     if not args.out_fasta:
-        args.out_fasta = args.cutadapt_prefix + '.ca.re.fasta'
+        args.out_fasta = args.cutadapt_prefix + '.ca.re.fasta' # args.cutadapt_prefix uninitialized! 
     rename = args.rename
     
     # minimum read length: word length in megablast used for cluster annotation
@@ -53,8 +53,8 @@ def main(args):
             if f_line.startswith('@') and (k % 4) == 0: # get read name
                 i += 1
                 if rename:
-                    f_name = '>%d/1\n' % i
-                    r_name = '>%d/2\n' % i
+                    f_name = '>%s_%d/1\n' % (args.cutadapt_prefix, i)
+                    r_name = '>%s_%d/2\n' % (args.cutadapt_prefix, i)
                 else:
                     f_name = '>%s/1\n' % f_line[1:-1]
                     r_name = '>%s/2\n' % r_line[1:-1]

@@ -30,11 +30,11 @@ def run_command(command,
             raise RuntimeError("%s error:\n%s" % (command[0], err))
 
         if outfile:
-            with open(outfile, 'w') as o:
+            with open(outfile, 'wb') as o:
                 o.write(out)
 
         if errfile:
-            with open(errfile, 'a') as e:
+            with open(errfile, 'ab') as e:
                 e.write(err)
         if return_out:
             return out
