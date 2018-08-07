@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='dopseq',
-	version='1.0.0-beta',
+	version='1.0.1-a',
 	description='Bioinformatics pipeline for chromosome sequencing analysis',
 	author='Alex Makunin',
 	author_email='alex@mcb.nsc.ru',

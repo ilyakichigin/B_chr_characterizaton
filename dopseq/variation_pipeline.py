@@ -52,9 +52,10 @@ def add_read_groups(bam, gatk, dry_run=True):
 def generate_names(sample, ref, reg):
     """Output filenames generator"""
     genome = ref.split('/')[-1].split('.')[0]
+    reg_name = reg.split('/')[-1][:-4]
     base = '%s/%s.%s' % (sample, sample, genome)
     assert reg.endswith('.bed')
-    var_base = sample + '/' + reg.split('/')[-1][:-4]
+    var_base = '%s/%s.%s.%s' % (sample, sample, genome, reg_name)
 
     names = {
         # input files
@@ -70,7 +71,7 @@ def generate_names(sample, ref, reg):
         'vcf': var_base + '.vcf',
         'ann_vcf': var_base + '.ann.vcf',
         'ann_html': var_base + '.ann.html',
-        'ann_stat': var_base + '.ann.stat.txt'
+        'ann_stat': var_base + '.ann.txt'
         }
     return names
 

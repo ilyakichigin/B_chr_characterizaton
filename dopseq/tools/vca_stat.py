@@ -237,6 +237,7 @@ def main(args):
             utils.run_command(feature_args, errfile=args.log_file,
                               dry_run=args.dry_run)
 
+    sys.stderr.write('Generating annotation statistics: %s\n' % args.out_file)
     if args.dry_run:
         return 0
 
