@@ -107,10 +107,17 @@ def generate_filenames(t, c, o):
     return {'t': t,
             'c': c,
             'o': o,
-            'tns': t + 'namesort.temp',
-            'cns': c + 'namesort.temp',
-            'ons': o + 'namesort.temp'
+            'tns': t + '.namesort.temp',
+            'cns': c + '.namesort.temp',
+            'ons': o + '.namesort.temp'
             }
+
+def make_dirs(out_file, log_file):
+
+    for f in (out_file, log_file):
+        d = os.path.dirname(f)
+        if not os.path.isdir(d) and d != '':
+            os.makedirs(d)
 
 def main(args):
     
@@ -118,9 +125,9 @@ def main(args):
         assert f.endswith('.bam')
     fn = generate_filenames(args.target_bam, args.contam_bam, args.out_bam)
    
-    utils.bam_sort(fn['t'], fn['tns'], name_sort=True, verbose=False, 
+    utils.bam_sort(fn['t'], fn['tns'], name_sort=True, verbose=True, 
                    dry_run=args.dry_run)
-    utils.bam_sort(fn['c'], fn['cns'], name_sort=True, verbose=False, 
+    utils.bam_sort(fn['c'], fn['cns'], name_sort=True, verbose=True, 
                    dry_run=args.dry_run)
 
     sys.stderr.write('Filtering %s using contaminant alignment %s\n' 
@@ -133,6 +140,8 @@ def main(args):
     sys.stderr.write('Output: %s\n' % args.out_bam)
 
     if not args.dry_run:
+
+        make_dirs(args.out_bam, args.stat_file)
         
         with pysam.AlignmentFile(fn['tns']) as t_file, \
              pysam.AlignmentFile(fn['cns']) as c_file, \

@@ -52,8 +52,11 @@ def main(args):
                          'bedtools count -c 1 -o count > %s' % (args.in_bam,
                                                                 args.out_bed))
     else:
+        d = os.path.dirname(args.out_bed)
+        if not os.path.isdir(d):
+            os.makedirs(d)
         s = pybedtools.BedTool(args.in_bam)
-        o = s.bamtobed().sort().merge(c=1, o='count').saveas(args.out_bed)
+        o = s.bam_to_bed().sort().merge(c=1, o='count').saveas(args.out_bed)
     
     # init_bed = utils.run_command('%s bamtobed -i %s' % (args.bedtools_path, 
     #                                                     args.in_bam), 
