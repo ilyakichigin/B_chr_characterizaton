@@ -33,15 +33,12 @@ def run_command(command,
         (out, err) = p.communicate(input=stdin)
         if p.returncode != 0:
             raise RuntimeError("%s error:\n%s" % (command[0], err))
-
         if outfile:
             with open(outfile, 'wb') as o:
                 o.write(out)
-
         if errfile:
             with open(errfile, 'ab') as e:
                 e.write(err)
-
         if return_out:
             return out
 
