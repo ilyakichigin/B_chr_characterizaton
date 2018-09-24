@@ -47,25 +47,25 @@ def generate_filenames(sample, target_path, contam_path):
 
     target_name = target_path.split('/')[-1].split('.')[0]
     contam_name = contam_path.split('/')[-1].split('.')[0]
-    sample = '%s/%s' % (sample, sample)
+    #sample = '%s/%s' % (sample, sample)
 
     names = {
-        'f_trim_reads': '%s.ca.R1.fastq.gz' % sample,
-        'r_trim_reads': '%s.ca.R2.fastq.gz' % sample,
-        'ca_log': '%s.ca.log' % sample,
+        'f_trim_reads': '0_fastq/%s.ca.R1.fastq.gz' % sample,
+        'r_trim_reads': '0_fastq/%s.ca.R2.fastq.gz' % sample,
+        'ca_log': '0_fastq/log/%s.ca.log' % sample,
         'target_path': target_path,
         'contam_path': contam_path,
         'target_name': target_name,
         'contam_name': contam_name,
-        'target_bam': '%s.%s.bam' % (sample, target_name),
-        'contam_bam': '%s.%s.bam' % (sample, contam_name),
-        'filter_bam': '%s.%s.filter.bam' % (sample, target_name),
-        'filter_log': '%s.%s.filter.log' % (sample, target_name),
-        'pos_bed': '%s.%s.pos.bed' % (sample, target_name),
-        'reg_tsv': '%s.%s.reg.tsv' % (sample, target_name),
-        'reg_pdf': '%s.%s.reg.pdf' % (sample, target_name),
-        'stat_file': '%s.stats.txt' % sample,
-        'repexpl_fasta': '%s.ca.re.fasta' % sample
+        'target_bam': '1_aln/%s.%s.bam' % (sample, target_name),
+        'contam_bam': '1_aln/%s.%s.bam' % (sample, contam_name),
+        'filter_bam': '2_filter/%s.%s.filter.bam' % (sample, target_name),
+        'filter_log': '2_filter/%s.%s.filter.log' % (sample, target_name),
+        'pos_bed': '3_bed/%s.%s.pos.bed' % (sample, target_name),
+        'reg_tsv': '4_reg/%s.%s.reg.tsv' % (sample, target_name),
+        'reg_pdf': '4_reg/%s.%s.reg.pdf' % (sample, target_name),
+        'stat_file': '5_stats/%s.stats.txt' % sample,
+        'repexpl_fasta': '6_fasta/%s.ca.re.fasta' % sample
         }
 
     return names

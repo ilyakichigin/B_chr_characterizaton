@@ -52,25 +52,25 @@ def add_read_groups(bam, gatk, samtools, dry_run=True):
 def generate_names(sample, ref, reg):
     """Output filenames generator"""
     genome = ref.split('/')[-1].split('.')[0]
-    base = '%s/%s.%s' % (sample, sample, genome)
+    base = '%s.%s' % (sample, genome)
     assert reg.endswith('.bed')
     var_base = sample + '/' + reg.split('/')[-1][:-4]
 
     names = {
         # input files
-        'bam': base + '.filter.bam',
-        'pos': base + '.pos.bed',
+        'bam': '2_filter/%s.filter.bam' % base,
+        'pos': '3_bed/%s.pos.bed' % base,
         # output files
-        'log': var_base + '.log',
-        'reg_pos': var_base + '.pos.bed',
+        'log': 'v0_log/%s.log' % base,
+        'reg_pos': 'v1_regpos/%s.regpos.bed' % base,
         'fadict': '.'.join(ref.split('.')[:-1]) + '.dict',
         'faidx': ref + '.fai',
-        'md_bam': base + '.filter.rmdup.bam',
-        'md_log': base + '.filter.rmdup.log',
-        'vcf': var_base + '.vcf',
-        'ann_vcf': var_base + '.ann.vcf',
-        'ann_html': var_base + '.ann.html',
-        'ann_stat': var_base + '.ann.stat.txt'
+        'md_bam': 'v2_rmdup/%s.filter.rmdup.bam' % base,
+        'md_log': 'v0_log/%s.filter.rmdup.log' % base,
+        'vcf': 'v3_gatk/%s.vcf' % base,
+        'ann_vcf': 'v4_ann/%s.ann.vcf' % base,
+        'ann_html': 'v4_ann/%s.ann.html' % base,
+        'ann_stat': 'v4_ann/%s.ann.stat.txt' % base
         }
     return names
 
