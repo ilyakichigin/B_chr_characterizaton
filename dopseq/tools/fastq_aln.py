@@ -20,7 +20,7 @@ def parse_command_line_arguments():
                         help='Optional: fastq file with reverse reads')
     parser.add_argument('-r', '--reference_genome', 
                         help='Path to reference genome unpacked fasta')
-    parser.add_argument('-o', '--out_bam', default='test.bam',
+    parser.add_argument('-o', '--out_bam', default=None,
                         help='Output BAM file name')
     parser.add_argument('-a', '--aligner', default='bwa',
                         help='Aligner to use. Possible values: '
@@ -32,6 +32,8 @@ def parse_command_line_arguments():
                         'quoted string. For reference, see alignmer manuals.')
     parser.add_argument('-d', '--dry_run', action='store_true', default=False, 
                         help='Print out commands and exit')
+    parser.add_argument('-ld', '--log_file', default=None, 
+                        help='Path to log file')
 
     return parser.parse_args()
 
@@ -41,7 +43,7 @@ def main(args):
     # outputs
     assert args.out_bam.endswith('.bam')
     out_sam = '%s.sam' % (args.out_bam[:-4]) 
-    log_file = '%s.%s.log' % (args.out_bam[:-4], args.aligner) 
+    #log_file = '%s.%s.log' % (args.out_bam[:-4], args.aligner) 
     
     if args.aligner == 'bt2':
         if not args.aligner_path:
@@ -64,7 +66,7 @@ def main(args):
                 args.fastq_F_file, args.fastq_R_file, 
                 args.reference_genome, out_sam)
         utils.run_command(bt2_align_command, dry_run=args.dry_run, 
-                              outfile=None, errfile=log_file)
+                              outfile=None, errfile=args.log_file)
 
     elif args.aligner == 'bwa':
         if not args.aligner_path:
@@ -82,7 +84,7 @@ def main(args):
                 args.aligner_path, args.aligner_args, args.reference_genome, 
                 args.fastq_F_file, args.fastq_R_file)
         utils.run_command(bwa_align_command, dry_run=args.dry_run, 
-                              outfile=out_sam, errfile=log_file)
+                              outfile=out_sam, errfile=args.log_file)
 
     elif args.aligner == 'bbm':
         raise ValueError('bbmap alignment support discontinued.'

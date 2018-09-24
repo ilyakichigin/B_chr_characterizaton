@@ -20,6 +20,11 @@ def run_command(command,
             sys.stderr.write(' 2>> %s' % errfile)
         sys.stderr.write('\n')
     if not dry_run:
+        for f in (outfile, errfile):
+            if f:
+                d = os.path.dirname(f)
+                if not os.path.isdir(d):
+                    os.makedirs(d)
         command = shlex.split(command)
         p = subprocess.Popen(command,
                              stdin=subprocess.PIPE,
@@ -36,6 +41,7 @@ def run_command(command,
         if errfile:
             with open(errfile, 'ab') as e:
                 e.write(err)
+
         if return_out:
             return out
 

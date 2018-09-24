@@ -58,9 +58,11 @@ def generate_filenames(sample, target_path, contam_path):
         'target_name': target_name,
         'contam_name': contam_name,
         'target_bam': '1_aln/%s.%s.bam' % (sample, target_name),
+        'target_log': '1_aln/log/%s.%s.log' % (sample, target_name),
         'contam_bam': '1_aln/%s.%s.bam' % (sample, contam_name),
+        'contam_log': '1_aln/log/%s.%s.log' % (sample, contam_name),
         'filter_bam': '2_filter/%s.%s.filter.bam' % (sample, target_name),
-        'filter_log': '2_filter/%s.%s.filter.log' % (sample, target_name),
+        'filter_log': '2_filter/log/%s.%s.filter.log' % (sample, target_name),
         'pos_bed': '3_bed/%s.%s.pos.bed' % (sample, target_name),
         'reg_tsv': '4_reg/%s.%s.reg.tsv' % (sample, target_name),
         'reg_pdf': '4_reg/%s.%s.reg.pdf' % (sample, target_name),
@@ -193,14 +195,15 @@ def main():
                                      'OK!\n' % (fnames[g + '_bam'], g))
                     continue
                 fa_args = argparse.Namespace(
-                    fastq_F_file=fnames['f_trim_reads'],
-                    fastq_R_file=fnames['r_trim_reads'],
-                    reference_genome=fnames[g + '_path'],
-                    out_bam=fnames[g + '_bam'],
-                    aligner=conf['aln'],
-                    aligner_path=aligner_path,
-                    aligner_args=aligner_args,
-                    dry_run = args.dry_run)
+                    fastq_F_file = fnames['f_trim_reads'],
+                    fastq_R_file = fnames['r_trim_reads'],
+                    reference_genome = fnames[g + '_path'],
+                    out_bam = fnames[g + '_bam'],
+                    aligner = conf['aln'],
+                    aligner_path = aligner_path,
+                    aligner_args = aligner_args,
+                    dry_run = args.dry_run, 
+                    log_file = fnames[g + '_log'])
                 fastq_aln.main(fa_args)
             sys.stderr.write('----Complete!----\n')
 
