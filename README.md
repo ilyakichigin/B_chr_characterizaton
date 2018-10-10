@@ -2,53 +2,117 @@
 
 DOPseq_analyzer is a set of tools for processing high-throughput sequencing data generated from isolated (flow sorted or microdissected) chromosomes.
 
-Currently, three pipelines are implemented: 
+Current version implements chromosomal region prediction pipeline (`dopseq`) including 
+- read trimming (`cutadapt`) and qc (`fastqc`)
+- alignment to reference genome (`bwa mem`)
+- PCR duplicate and quality filtering (`Picard`, `samtools`), and finally
+- region calling with a custom script based on `DNAcopy` Bioconductor package.
 
-1. Chromosomal region prediction pipeline (`dopseq_pipeline`) includes read trimming, alignment to reference genome, contamination filtering, region calling and statistics calculation.
-2. Variant calling and annotation pipeline for validated chromosome-specific regions (`variation_pipeline`).
-3. Analysis of anole microchromosomes (`anolis/pipeline/anolis_dopseq_pipe.py`) includes steps similar to dopseq_pipeline. It is optimized for reference genomes consisting of scaffolds and has a possibility to handle WGA libraries. This pipeline is not included in the pipeline installation and can be called only directly. Maintained by ilyakichigin.
+This software relies on [Snakemake](https://snakemake.readthedocs.io/en/stable/) for workflow control and on [conda](https://conda.io/docs/) for dependencies management. The pipeline implementation is based on [Snakemake workflow for dna-seq](https://github.com/snakemake-workflows/dna-seq-gatk-variant-calling).
 
-# Installation
+# Quick start
 
-Dependencies for `dopseq_pipeline`:
+First, install snakemake using your preferred version of [conda](https://conda.io/docs/user-guide/install/index.html)
+```
+conda install snakemake
+```
 
-1. [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) (tested on v.2.1.0, 2.2.4) or [bwa](https://sourceforge.net/projects/bio-bwa/files/) (tested on v.0.7.12)
-
-2. [bedtools](http://bedtools.readthedocs.io/en/latest/) (tested on v.2.17.0 and v.2.24.0)
-
-3. [DNAcopy](https://bioconductor.org/packages/release/bioc/html/DNAcopy.html) R (Bioconductor) package 
-
-Dependencies for `variation_pipeline`:
-
-1. [GATK 4](https://software.broadinstitute.org/gatk/download/beta) (tested on beta.1)
- 
-2. [snpEff](http://snpeff.sourceforge.net/) (tested on v.3.3.0 and v.4.3t)
-
-Installation:
-
+Clone dopseq, note that the results are written into the installation folder by default
 ```
 git clone https://github.com/ilyakichigin/DOPseq_analyzer.git
 cd DOPseq_analyzer
-pip install --user .
 ```
 
-# Usage 
-
-Pipeline for chromosome region identification can be called with the command:
+Next add your sample data to `samples.tsv` and your analysis parameters to `config.yaml`. After that, you can test the pipeline with a dry run:
 ```
-dopseq_pipeline [-c|-d|-s] dopseq_makefile.yaml
+snakemake --use-conda -n
 ```
-Makefile example can be found at `examples/dopseq_makefile.yaml` in this repository or copied to your working directory by running `dopseq_pipeline -c my_makefile.yaml`. Use this file to specify your input data and parameters. 
 
-Use `dopseq_pipeline -s dopseq_makefile.yaml > genome.sizes` to generate tab-separated file listing chromosomes and their sizes for the reference genome specified in the makefile. 
-
-Dry run `-d` option provides command listing and checks if all the input files are present. After that, pipeline can be run with `dopseq_pipeline my_makefile.yaml`
-
-Briefly, this pipeline trims and aligns reads to the reference genome (and optonally contaminant genome, human being most obvious for mammalian chromosome samples), filters the alignment, and classifies selected chromosomes of the reference genome based on mean distances between mapped read positions. Regions with lower means can be further interpreted as present on the isolated chromosomes. Note that these regions cannot be used 'as is' and require manual inspection and correction. Pipeline steps and output files are described in the example makefile. 
-
-
-Pipeline for variant calling and annotation can be called similarly:
+And then run the analysis with
 ```
-variation_pipeline [-d|-c] variation_makefile.yaml
+snakemake --use-conda
 ```
-Currently, this pipeline runs GATK HaplotypeCaller and snpEff annotation with default settings for a given set of genome regions (presumably present on the chromosome of interest). It also creates a file with variation summary, including per region and per gene statistics. 
+
+The `--use-conda` parameter ensures that for each step all software internally used by `dopseq` will be downloaded and installed inside an isolated environment. Thus, the first run will take longer - in order to get all dependencies in place.
+
+# Steps and outputs description
+
+All output files are stored within the `results` folder, with subfolders numbered according to the analysis order and named by the output type. File names have prefixes corresponding to sample IDs. 
+
+- `0_fastqc_init` - FastQC analysis of the input reads;
+- `1_trimmed` - read trimming and filtering with cutadapt;
+- `2_fastqc_trim` - FastQC analysis of the trimmed reads, helps to identify the remaining problems with reads;
+- `3_mapped` - read mapping to reference genome with bwa mem;
+- `4_dedup` - removal of PCR duplicates with Picard MarkDuplicates (BAM removed, stats remain);
+- `5_filtered` - final alignment filtering by mapping quality and alignment length;
+- `6_merged` - merging all BAMs per sample with samtools merge;
+- `7_positions` - overlapping reads into read positions with pybedtools;
+- `8_regions` - genome segmentation based on distances between read positions with DNAcopy.
+
+# Output interpretation 
+
+The key outputs of the pipeline are per-sample genome segmentations located in `results/8_regions/{sample}.tsv` files. The segmentation is based on the end-to-start distances between genome positions covered by reads, or PD. The mean values are represented in `pd_mean` column. Regions with lower mean PD are more likely to be present on sampled chromosome (i.e., target regions), while regions with higher mean PD tend to represent a noise resulting from, e.g. contamination with whole-genome or external DNA. Thus, problem of target region identification can transformed into problem of drawing the borderline between low-PD target regions and high-PD contamination. Currently, this step is not automated as there are multiple confounding factors:
+
+- spurious high-PD clusters with low number of markers should be filtered;
+- some target regions are over-segmented due to mapping efficiency varying across the chromosome;
+- for fragmented reference genome assemblies there is no obvious distinction between high-PD and low-PD regions;
+- same problem arises with increase of evolutionary distance between sampled and reference species;
+- additional filters based on mean size or mean coverage for mapped positions can be useful in some cases.
+
+# Parameter setting
+
+## samples.tsv
+
+Tab separated file with sample data
+
+`sample` - sample name used as prefix for the output files.
+
+`unit` - multiple inputs (lanes, libraries, biological replicates etc) can be specified per sample. These are trimmed, aligned and filtered separately, so file prefixes for steps 0-5 include both sample and unit names separated by '-'.
+
+`platform` - used to `@RG PL` field of the per-unit BAMs, merged BAM contains all `@RG` lines. 
+
+`adapters` - sequencing or library adapters to be removed from reads:
+- `dop` DOP-PCR MW6 primer, reads without primer match at 5\` end are discarded;
+- `wga` WGA1 GP primer, reads without primer match at 5\` end are discarded;
+- `illumina` only remove Illumina standard adapter from 3\` end;
+- `none` do not trim adapters, just filter reads using parameters from configuration file
+For paired-end reads trimming with `dop` and `wga`, only pairs with primer matches in both reads are retained. To increase the amount of retained reads, you can specify forward and reverse reads as separate lanes of one sample.
+
+`fq1` - forward or single-end reads fastq file (can be gzipped).
+
+`fq2` - reverse reads fastq file. Keep blank for single-end reads.
+
+## config.yaml
+
+`samples` - path to tab-separated file with sample data
+
+`genome` - path to unpacked reference genome in fasta format. For non-model species selection of the reference balances between evolutionary proximity to the sample species and assembly quality. You may want to experiment with various references in order to obtain better quality results.
+
+`rmdup` - whether to perform PCR duplicate removal, boolean. In theory, should provide more sensible coverage results. However, amplicon-like recovery of same genomic regions in different biological samples suggest the opposite.
+
+`params` section provides software-related parameters. Note that some steps currently use only default settings (fastqc, bwa mem).
+- `threads` - number of parallel threads for `bwa mem` and `samtools merge` processes. Total number of cores used by the pipeline is controlled by `snakemake -j` parameter.
+- `cutadapt` - cutadapt general filtering options for paired-end (PE) and single-end (SE) reads. Default - trim terminal Ns and remove reads shorter than 20 bp.
+- `picard` - remove duplicates instead of marking them
+- `filter` - final unit BAM cleanup prior to merging includes filters of minimum mapping quality (use higher value for more stringent removal of repetitive mappings) and mapping length (higher value help to avoid spurious mappings at longer evolutionary distances).
+
+## Other files
+
+This section can be useful if you want to change parameters not listed above, as well as to add or remove steps.
+
+`Snakemake` file sets the desired output files and links to the other smk files: 
+- `rules/dopseq.smk` specifies all steps for outputs creation, configurable parameters are automatically picked up from `config.yaml`, for each step conda environment with all dependencies is created either by wrappers (which link to [wrapper repository](https://snakemake-wrappers.readthedocs.io/en/stable/)), or by conda directive (environments are located in `env` subfolder). 
+- `rules/common.smk` contains rules for filename and parameter setting based on sample data, which is located in `samples.tsv`.
+
+Scripts included in the package: `script/regions.py` converts filtered BAM to BED with positions (`results/7_positions`) and performs genome segmentation (`results/8_regions`).
+
+
+For further reading, please address [Snakemake documentation](https://snakemake.readthedocs.io/en/stable/)
+
+
+
+
+
+
+
+```

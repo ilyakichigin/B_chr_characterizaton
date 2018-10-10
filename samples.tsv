@@ -1,0 +1,5 @@
+sample	unit	platform	adapters	fq1	fq2
+A	lane1	ILLUMINA	wga	fastq/1_S1_L001_R1_001.fastq.gz	fastq/1_S1_L001_R2_001.fastq.gz
+B	lane1	ILLUMINA	dop	fastq/2_S2_L001_R1_001.fastq.gz	fastq/2_S2_L001_R1_001.fastq.gz
+B	lane2	LS454	dop_relaxed	fastq/2.fastq.gz
+C	lane1	ILLUMINA	illumina	fastq/3_S3_L001_R1_001.fastq.gz	fastq/3_S3_L001_R1_001.fastq.gz
