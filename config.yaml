@@ -1,6 +1,6 @@
 samples: samples.tsv
 
-genome: /absolute/path/to/genome.fa
+genome: /Users/am60/data/genome/canFam3_ensembl/CanFam3.1.dna_sm.toplevel.fa
 
 # whether to remove PCR/optical duplicates
 rmdup: true

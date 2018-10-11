@@ -9,10 +9,15 @@ import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
 
+in_bam = snakemake.input[0]
+genome_fai = snakemake.input.genome_fai
+out_pos = snakemake.output.pos
+out_reg = snakemake.output.reg
+sample = snakemake.params.sample
 
 # genome sizes
 genome = dict()
-with open(snakemake.input.genome_fai) as f:
+with open(genome_fai) as f:
     for l in f:
         ll = l.split('\t')
         try:
@@ -21,8 +26,8 @@ with open(snakemake.input.genome_fai) as f:
             pass
 
 # positions and distances between positions
-in_bam = pybedtools.BedTool(snakemake.input[0])
-pos_bed = in_bam.bam_to_bed().sort().merge(c=1, o='count').saveas(snakemake.output.pos)
+in_bam = pybedtools.BedTool(in_bam)
+pos_bed = in_bam.bam_to_bed().sort().merge(c=1, o='count').saveas(out_pos)
 pos = pos_bed.to_dataframe()
 pos['chrom'] = pos['chrom'].astype(str)
 dist = pos_bed.complement(g=genome).to_dataframe()
@@ -34,7 +39,7 @@ dnacopy = importr('DNAcopy')
 cna = robjects.r['CNA'](robjects.FloatVector(dist['log.dist']),
                         robjects.StrVector(dist['chrom']), 
                         robjects.IntVector(dist['end']), 
-                        data_type="logratio", sample=snakemake.params.sample)
+                        data_type="logratio", sample=sample)
 cna = robjects.r['smooth.CNA'](cna)
 segm = robjects.r['segment'](cna, verbose=0)
 
@@ -67,6 +72,11 @@ for r in regions.iterrows():
         pass
     shift_regs.append(cr)
 shift_regs = pd.DataFrame(shift_regs)
+shift_regs = shift_regs.rename(columns={
+        'ID':'sample',
+        'loc_start':'reg_start', 
+        'loc_end':'reg_end',
+        'seg_mean':'lg_pd_mean'})
 
 # main annotation
 def segment_positions(segm):
@@ -77,33 +87,33 @@ def segment_positions(segm):
     - one more position),
     get mean coverage and position size for positions within a segment
     """
-    chrom = segm.iloc[1]
-    start = segm.iloc[2]
-    end = segm.iloc[3]
-    segm_pos = pos[(pos['chrom'] == chrom) & 
-                    (pos['start'] >= start) & 
-                    (pos['start'] <= end)]
+    segm_pos = pos[(pos['chrom'] == segm['chrom']) & 
+                    (pos['start'] >= segm['reg_start']) & 
+                    (pos['start'] <= segm['reg_end'])]
     try:
-        segm['loc_start'] = segm_pos.iloc[0]['start'] # start of first pos in segment
-        segm['loc_end'] = segm_pos.iloc[-1]['end'] # end of last pos in segment
+        segm['reg_start'] = segm_pos.iloc[0]['start'] # start of first pos in segment
+        segm['reg_end'] = segm_pos.iloc[-1]['end'] # end of last pos in segment
         segm['num_mark'] = segm_pos.shape[0] # nrows
-        segm['cov_mean'] = segm_pos['name'].mean() # coverage as 'name' column in pos df
+        segm['pos_cov_mean'] = segm_pos['name'].mean() # coverage as 'name' column in pos df
         segm['pos_len_mean'] = (segm_pos['end']-segm_pos['start']).mean()
+        segm['pos_len_sum'] = (segm_pos['end']-segm_pos['start']).sum()
     except: # no positions in chromosome 
-        segm['loc_start'] = 0
-        #segm['loc_end'] already set to 
+        segm['reg_start'] = 0
+        segm['reg_end'] = segm['reg_end'] 
         segm['num_mark'] = 0
-        segm['cov_mean'] = 0
+        segm['pos_cov_mean'] = 0
         segm['pos_len_mean'] = 0
+        segm['pos_len_sum'] = 0
         # replacing seg_mean and pd_mean, as values produced by DNAcopy are not meaningful
-        segm['pd_mean'] = segm['loc_end']
-        segm['seg_mean'] = np.log10(segm['loc_end'])
-    segm['loc_len'] = segm['loc_end'] - segm['loc_start']
+        segm['pd_mean'] = segm['reg_end']
+        segm['lg_pd_mean'] = np.log10(segm['reg_end'])
+    segm['reg_len'] = segm['reg_end'] - segm['reg_start']
     segm['chrom_len'] = genome[segm['chrom']][1]
-    segm['prop_loc_len'] = segm['loc_len'] / segm['chrom_len']
+    segm['prop_reg_covered'] = segm['pos_len_sum'] / segm['reg_len']
+    segm['prop_chrom_len'] = segm['reg_len'] / segm['chrom_len']
     return segm
-# slow apply
+# slowest part of script - apply with entire positions df filtering at each segment
 corr_regs = shift_regs.apply(segment_positions, axis=1)
 
 #output
-corr_regs.to_csv(snakemake.output.reg, sep="\t")
+corr_regs.to_csv(out_reg, sep="\t", index=False)

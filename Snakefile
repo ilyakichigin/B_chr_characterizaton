@@ -5,7 +5,8 @@ rule all:
     input:
         expand("results/8_regions/{sample}.tsv", sample=units["sample"].unique()),
         expand("results/0_fastqc_init/{prefix}.html", prefix=units.prefix),
-        expand("results/2_fastqc_trim/{prefix}.html", prefix=units.prefix)
+        expand("results/2_fastqc_trim/{prefix}.html", prefix=units.prefix),
+        "results/stats.xlsx"
         # "results/2_fastqc_trim/{sample}-{unit}.html".format(units.index)
         # "results/qc/multiqc.html"
         # 'trimmed/A-lane2.fastq.gz',

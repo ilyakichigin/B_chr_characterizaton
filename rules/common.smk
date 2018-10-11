@@ -58,17 +58,22 @@ def get_trimmed_reads(wildcards):
     return "results/1_trimmed/{sample}-{unit}.fastq.gz".format(**wildcards)
 
 
-def get_dedup_bams(wildcards):
-    """Get all aligned reads of given sample."""
-    return expand("results/4_dedup/{sample}-{unit}.bam",
-                  sample=wildcards.sample,
-                  unit=units.loc[wildcards.sample].unit)
+# def get_dedup_bams(wildcards):
+#     """Get all aligned reads of given sample."""
+#     return expand("results/4_dedup/{sample}-{unit}.bam",
+#                   sample=wildcards.sample,
+#                   unit=units.loc[wildcards.sample].unit)
 
-def get_filter_bams(wildcards):
-    """Get all aligned reads of given sample."""
+def get_filtered_bams(wildcards):
+    """Get all per-unit alignments of given sample"""
     return expand("results/5_filtered/{sample}-{unit}.bam",
                   sample=wildcards.sample,
                   unit=units.loc[wildcards.sample].unit)
+
+def get_position_beds(wildcards):
+    """Get all position BED files"""
+    return expand("results/7_positions/{sample}.bed",
+                 sample=units["sample"].unique())
 
 def ampl_to_cutadapt_pe(wildcards):
 
@@ -98,10 +103,10 @@ def ampl_to_cutadapt_se(wildcards):
     elif ampl == 'wga':
         return '-a TTGTGTTGGGTGTGTTTGG...CCAAACACACCCAACACAA -e 0.2 --discard-untrimmed'
     # relaxed versions - do not discard untrimmed
-    elif ampl == 'dop_relaxed':
-        return '-g CCGACTCGAGNNNNNNATGTGG...CCACATNNNNNNCTCGAGTCGG'
-    elif ampl == 'wga_relaxed':
-        return '-g TTGTGTTGGGTGTGTTTGG...CCAAACACACCCAACACAA -e 0.2'
+    # elif ampl == 'dop_relaxed':
+    #     return '-g CCGACTCGAGNNNNNNATGTGG...CCACATNNNNNNCTCGAGTCGG'
+    # elif ampl == 'wga_relaxed':
+    #     return '-g TTGTGTTGGGTGTGTTTGG...CCAAACACACCCAACACAA -e 0.2'
     elif ampl == 'illumina':
         return ' -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
     return ''

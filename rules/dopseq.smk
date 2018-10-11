@@ -13,7 +13,7 @@ rule trim_reads_se:
         get_fastq
     output:
         fastq="results/1_trimmed/{sample}-{unit}.fastq.gz",
-        qc="results/1_trimmed/{sample}-{unit}.qc.txt"
+        qc="results/1_trimmed/{sample}-{unit}.trim.txt"
     params:
         ampl_to_cutadapt_se, config["params"]["cutadapt"]["se"]
     log:
@@ -21,14 +21,13 @@ rule trim_reads_se:
     wrapper:
         "0.27.1/bio/cutadapt/se"
 
-
 rule trim_reads_pe:
     input:
         get_fastq
     output:
         fastq1="results/1_trimmed/{sample}-{unit}.1.fastq.gz",
         fastq2="results/1_trimmed/{sample}-{unit}.2.fastq.gz",
-        qc="results/1_trimmed/{sample}-{unit}.qc.txt"
+        qc="results/1_trimmed/{sample}-{unit}.trim.txt"
     params:
         ampl_to_cutadapt_pe, config["params"]["cutadapt"]["pe"]
     log:
@@ -86,7 +85,7 @@ rule map_reads_bwa_mem:
     wrapper:
         "0.27.1/bio/bwa/mem"
 
-# alignment filtering
+# alignment filtering and merging
 rule mark_duplicates:
     input:
         "results/3_mapped/{sample}-{unit}.sorted.bam"
@@ -100,14 +99,13 @@ rule mark_duplicates:
     wrapper:
         "0.27.1/bio/picard/markduplicates"
 
-
 rule samptools_filter:
     input:
         # get_dedup_bams
-        "results/4_dedup/{sample}-{unit}.sorted.bam"
+        "results/4_dedup/{sample}-{unit}.bam"
     output:
-        "results/5_filtered/{sample}-{unit}.bam"
-        #metrics="results/5_filtered/{sample}-{unit}.filter.txt"
+        bam="results/5_filtered/{sample}-{unit}.bam",
+        metrics="results/5_filtered/{sample}-{unit}.filter.txt"
     params:
         minq=config["params"]["filter"]["min_mapq"],
         minl=config["params"]["filter"]["min_len"]
@@ -116,12 +114,12 @@ rule samptools_filter:
     shell:
         "samtools view -h -q {params.minq} {input} | "
         "awk 'length($10) > {params.minl} || $1 ~ /^@/' | "
-        "samtools view -bS - > {output}"
+        "samtools view -bS - > {output.bam}; "
+        "samtools stats {output.bam} > {output.metrics}"
 
 rule samtools_merge:
     input:
-        # get_filtered_bams
-        "results/5_filtered/{sample}-{unit}.bam"
+        get_filtered_bams
     output:
         "results/6_merged/{sample}.bam"
     params:
@@ -130,8 +128,6 @@ rule samtools_merge:
     wrapper:
         "0.27.1/bio/samtools/merge"
 
-
-
 # regions
 rule regions:
     input:
@@ -139,7 +135,7 @@ rule regions:
         genome_fai=config["genome"] + '.fai'
     output:
         pos="results/7_positions/{sample}.bed",
-        reg="results/7_regions/{sample}.tsv"
+        reg="results/8_regions/{sample}.tsv"
     params:
         sample="{sample}"
     conda:
@@ -148,12 +144,18 @@ rule regions:
         "../scripts/regions.py"
 
 # statistics
-# rule stats:
-#     input:
-#         "results/6_filtered/{sample}.bam"
-#     output:
-#         "results/stats.tsv"
-#     conda:
-#         "../envs/stats.yaml"
-#     script:
-#         "../scripts/stats.py"
+rule stats:
+    input:
+        get_position_beds
+    output:
+        "results/stats.xlsx"
+    params:
+        samples=config["samples"],
+        trim="results/1_trimmed",
+        dedup="results/4_dedup",
+        flt="results/5_filtered",
+        pos="results/7_positions/"
+    conda:
+        "../envs/stats.yaml"
+    script:
+        "../scripts/stats.py"
