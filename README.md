@@ -14,7 +14,7 @@ This software relies on [Snakemake](https://snakemake.readthedocs.io/en/stable/)
 
 First, install snakemake using your preferred version of [conda](https://conda.io/docs/user-guide/install/index.html)
 ```
-conda install snakemake
+conda install -c bioconda -c conda-forge snakemake
 ```
 
 Clone dopseq, checkout the snakemake version branch.
