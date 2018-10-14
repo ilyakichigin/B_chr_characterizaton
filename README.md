@@ -21,11 +21,11 @@ Clone dopseq, checkout the snakemake version branch.
 ```
 git clone https://github.com/ilyakichigin/DOPseq_analyzer.git
 cd DOPseq_analyzer
-git checkout smk_dev #
+git checkout smk_dev
 ```
 Note that the results are written into the installation folder by default.
 
-Next add your sample data to `samples.tsv` and your analysis parameters to `config.yaml`. See 'Parameters setting' section for details.
+Next, add your sample data to `samples.tsv` and your analysis parameters to `config.yaml`. See ['Parameter setting'](#parameter_setting) section for details.
 
 After that, you can test the pipeline with a dry run:
 ```
@@ -37,22 +37,22 @@ And then run the analysis with
 snakemake --use-conda
 ```
 
-`--use-conda` parameter ensures that for each step all software internally used by `dopseq` will be downloaded and installed inside an isolated environment. Thus, the first run will take longer - in order to get all dependencies in place.
+`--use-conda` parameter ensures that for each step nececcary packages will be downloaded and installed inside an isolated environment. Thus, the first run will take longer - in order to get all dependencies in place.
 
 # Steps and outputs description
 
-All output files are stored within the `results` folder, with subfolders numbered according to the analysis sequence and named by the output type. File names have prefixes corresponding to sample IDs. 
+Output files are stored within the `results` folder, with subfolders numbered according to the analysis sequence and named by the output type. File names have prefixes corresponding to sample IDs. 
 
-- `0_fastqc_init` - FastQC analysis of the input reads;
+- `0_fastqc_init` - FastQC on the input reads;
 - `1_trimmed` - read trimming and filtering with cutadapt;
-- `2_fastqc_trim` - FastQC analysis of the trimmed reads, helps to identify the remaining problems with reads;
+- `2_fastqc_trim` - FastQC on the trimmed reads, helps to identify the remaining problems with reads;
 - `3_mapped` - read mapping to reference genome with bwa mem;
 - `4_dedup` - removal of PCR duplicates with Picard MarkDuplicates (BAM removed, stats remain);
-- `5_filtered` - final alignment filtering by mapping quality and alignment length;
-- `6_merged` - merging all BAMs per sample with samtools merge;
-- `7_positions` - overlapping reads into read positions with pybedtools;
+- `5_filtered` - alignment filtering by mapping quality and aligned fragment length with samtools and awk;
+- `6_merged` - merging all BAMs per sample with samtools;
+- `7_positions` - merging overlapping reads into read positions with pybedtools;
 - `8_regions` - genome segmentation based on distances between read positions with DNAcopy;
-- `stats.xlsx` - statistics for sequencing, mapping, filtering, and positions
+- `stats.xlsx` - statistics for sequencing, mapping, filtering, and positions.
 
 # Output interpretation 
 
@@ -94,7 +94,7 @@ For paired-end reads trimming with `dop` and `wga`, only pairs with primer match
 
 ## config.yaml
 
-`samples` - path to tab-separated file with sample data
+`samples` - path to tab-separated file with sample data.
 
 `genome` - path to unpacked reference genome in fasta format. For non-model species selection of the reference balances between evolutionary proximity to the sample species and assembly quality. You may want to experiment with various references in order to obtain better quality results. Only single reference genome per project is currently supported.
 
