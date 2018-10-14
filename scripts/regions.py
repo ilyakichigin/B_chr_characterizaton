@@ -76,6 +76,7 @@ shift_regs = shift_regs.rename(columns={
         'ID':'sample',
         'loc_start':'reg_start', 
         'loc_end':'reg_end',
+        'num_mark':'reg_pos',
         'seg_mean':'lg_pd_mean'})
 
 # main annotation
@@ -93,15 +94,17 @@ def segment_positions(segm):
     try:
         segm['reg_start'] = segm_pos.iloc[0]['start'] # start of first pos in segment
         segm['reg_end'] = segm_pos.iloc[-1]['end'] # end of last pos in segment
-        segm['num_mark'] = segm_pos.shape[0] # nrows
+        segm['reg_pos'] = segm_pos.shape[0] # nrows
         segm['pos_cov_mean'] = segm_pos['name'].mean() # coverage as 'name' column in pos df
+        segm['reg_reads'] = segm_pos['name'].sum()
         segm['pos_len_mean'] = (segm_pos['end']-segm_pos['start']).mean()
         segm['pos_len_sum'] = (segm_pos['end']-segm_pos['start']).sum()
     except: # no positions in chromosome 
         segm['reg_start'] = 0
         segm['reg_end'] = segm['reg_end'] 
-        segm['num_mark'] = 0
+        segm['reg_pos'] = 0
         segm['pos_cov_mean'] = 0
+        segm['reg_reads'] = 0
         segm['pos_len_mean'] = 0
         segm['pos_len_sum'] = 0
         # replacing seg_mean and pd_mean, as values produced by DNAcopy are not meaningful

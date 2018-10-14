@@ -131,5 +131,5 @@ samples_out.apply(get_positions_stats, axis=1)
 # write
 writer = pd.ExcelWriter(snakemake.output[0])
 samples_out.to_excel(writer, sheet_name='Samples')
-lanes_out.to_excel(writer, sheet_name='Lanes', index=False)
+lanes_out.to_excel(writer, sheet_name='Units', index=False)
 writer.save()
