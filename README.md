@@ -25,7 +25,7 @@ git checkout smk_dev
 ```
 Note that the results are written into the installation folder by default.
 
-Next, add your sample data to `samples.tsv` and your analysis parameters to `config.yaml`. See ['Parameter setting'](#Parameter_setting) section for details.
+Next, add your sample data to `samples.tsv` and your analysis parameters to `config.yaml`. See ['Parameter setting'](#parameter-setting) section for details.
 
 After that, you can test the pipeline with a dry run:
 ```
