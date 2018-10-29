@@ -5,6 +5,10 @@ rule fastqc_init:
     output:
         html="results/0_fastqc_init/{sample}-{unit}.html",
         zip="results/0_fastqc_init/{sample}-{unit}.zip"
+    # params:
+    #     dir="results/0_fastqc_init/"
+    # conda:
+    #     "../env.yaml"
     wrapper:
         "0.27.1/bio/fastqc"
 
@@ -18,8 +22,14 @@ rule trim_reads_se:
         ampl_to_cutadapt_se, config["params"]["cutadapt"]["se"]
     log:
         "results/logs/cutadapt/{sample}-{unit}.log"
-    wrapper:
-        "0.27.1/bio/cutadapt/se"
+    conda:
+        "../env.yaml"
+    shell:
+        "cutadapt"
+        " {params}"
+        " -o {output.fastq}"
+        " {input}"
+        " > {output.qc} 2> {log}"
 
 rule trim_reads_pe:
     input:
@@ -32,8 +42,15 @@ rule trim_reads_pe:
         ampl_to_cutadapt_pe, config["params"]["cutadapt"]["pe"]
     log:
         "results/logs/cutadapt/{sample}-{unit}.log"
-    wrapper:
-        "0.27.1/bio/cutadapt/pe"
+    # conda:
+    #     "../env.yaml"
+    shell:
+        "cutadapt"
+        " {params}"
+        " -o {output.fastq1}"
+        " -p {output.fastq2}"
+        " {input}"
+        " > {output.qc} 2> {log}"
 
 rule fastqc_trim:
     input:
@@ -41,6 +58,10 @@ rule fastqc_trim:
     output:
         html="results/2_fastqc_trim/{sample}-{unit}.html",
         zip="results/2_fastqc_trim/{sample}-{unit}.zip"
+    # params:
+    #     dir="results/0_fastqc_init/"
+    # conda:
+    #     "../env.yaml"
     wrapper:
         "0.27.1/bio/fastqc"
 
@@ -55,9 +76,14 @@ rule bwa_index:
         config["genome"] + ".pac",
         config["genome"] + ".sa"
     log:
-        expand("results/logs/bwa_index/{genome}.log", genome=config["genome"])
-    wrapper:
-        "0.27.1/bio/bwa/index"
+        expand("results/logs/bwa_index/{genome}.log", genome=config["genome"].split('/')[-1])
+    conda:
+        "../env.yaml"
+    shell:
+        "bwa index"
+        " -p {input}"
+        " {input}"
+        " &> {log}"
 
 rule samtools_faidx:
     input:
@@ -65,9 +91,11 @@ rule samtools_faidx:
     output:
         config["genome"] + '.fai'
     conda:
-        "../envs/samtools.yaml"
+        "../env.yaml"
+    log:
+        expand("results/logs/samtools_faildx/{genome}.log", genome=config["genome"].split('/')[-1])
     shell:
-        "samtools faidx {input}"
+        "samtools faidx {input} 2> {log}"
 
 rule map_reads_bwa_mem:
     input:
@@ -75,15 +103,23 @@ rule map_reads_bwa_mem:
     output:
         "results/3_mapped/{sample}-{unit}.sorted.bam"
     log:
-        "results/logs/bwa_mem/{sample}-{unit}.log"
+        mem="results/logs/bwa_mem/{sample}-{unit}.log",
+        sort="results/logs/samtools_sort/{sample}-{unit}.log",
     params:
         index=config["genome"],
-        extra=get_read_group,
-        sort="samtools",
-        sort_order="coordinate"
+        extra=get_read_group
     threads: config["params"]["threads"]
-    wrapper:
-        "0.27.1/bio/bwa/mem"
+    conda:
+        "../env.yaml"
+    shell:
+        "bwa mem"
+        " -t {threads} "
+        "{params.extra} "
+        "{params.index} "
+        "{input.reads} "
+        "2> {log.mem} | "
+        "samtools sort - "
+        "-o {output} &> {log.sort}"
 
 # alignment filtering and merging
 rule mark_duplicates:
@@ -96,8 +132,12 @@ rule mark_duplicates:
         "results/logs/picard/dedup/{sample}-{unit}.log"
     params:
         config["params"]["picard"]["MarkDuplicates"]
-    wrapper:
-        "0.27.1/bio/picard/markduplicates"
+    conda:
+        "../env.yaml"
+    shell:
+        "picard MarkDuplicates {params} INPUT={input} "
+        "OUTPUT={output.bam} METRICS_FILE={output.metrics} "
+        "&> {log}"
 
 rule samptools_filter:
     input:
@@ -110,7 +150,7 @@ rule samptools_filter:
         minq=config["params"]["filter"]["min_mapq"],
         minl=config["params"]["filter"]["min_len"]
     conda:
-        "../envs/samtools.yaml"
+        "../env.yaml"
     shell:
         "samtools view -h -q {params.minq} {input} | "
         "awk 'length($10) > {params.minl} || $1 ~ /^@/' | "
@@ -125,8 +165,11 @@ rule samtools_merge:
     params:
         "" 
     threads: config["params"]["threads"]
-    wrapper:
-        "0.27.1/bio/samtools/merge"
+    conda:
+        "../env.yaml"
+    shell:
+        "samtools merge --threads {threads} {params} "
+        "{output} {input}"
 
 # regions
 rule regions:
@@ -139,7 +182,7 @@ rule regions:
     params:
         sample="{sample}"
     conda:
-        "../envs/regions.yaml"
+        "../env.yaml"
     script:
         "../scripts/regions.py"
 
@@ -156,6 +199,6 @@ rule stats:
         flt="results/5_filtered",
         pos="results/7_positions/"
     conda:
-        "../envs/stats.yaml"
+        "../env.yaml"
     script:
         "../scripts/stats.py"

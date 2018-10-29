@@ -1,6 +1,6 @@
 samples: samples.tsv
 
-genome: /path/to/genome/genome.fa
+genome: genome/genome.fa
 
 # whether to remove PCR/optical duplicates
 rmdup: true
