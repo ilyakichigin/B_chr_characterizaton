@@ -10,7 +10,7 @@ from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
 
 in_bam = snakemake.input[0]
-genome_fai = snakemake.input.genome_fai
+genome_fai = str(snakemake.input.genome_fai) # for some reason read as snakemake.io.Namedlist
 out_pos = snakemake.output.pos
 out_reg = snakemake.output.reg
 sample = snakemake.params.sample

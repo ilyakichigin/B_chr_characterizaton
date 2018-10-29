@@ -68,15 +68,15 @@ rule fastqc_trim:
 # genome preparation and alignment
 rule bwa_index:
     input:
-        config["genome"]
+        "{genomepath}"
     output:
-        config["genome"] + ".amb",
-        config["genome"] + ".ann",
-        config["genome"] + ".bwt",
-        config["genome"] + ".pac",
-        config["genome"] + ".sa"
+        "{genomepath}.amb",
+        "{genomepath}.ann",
+        "{genomepath}.bwt",
+        "{genomepath}.pac",
+        "{genomepath}.sa"
     log:
-        expand("results/logs/bwa_index/{genome}.log", genome=config["genome"].split('/')[-1])
+        expand("results/logs/bwa_index/{genome}.log", genome="{genomepath}".split("/")[-1])
     conda:
         "../env.yaml"
     shell:
@@ -87,13 +87,13 @@ rule bwa_index:
 
 rule samtools_faidx:
     input:
-        config["genome"]
+        "{genomepath}"
     output:
-        config["genome"] + '.fai'
+        "{genomepath}.fai"
     conda:
         "../env.yaml"
     log:
-        expand("results/logs/samtools_faildx/{genome}.log", genome=config["genome"].split('/')[-1])
+        expand("results/logs/samtools_faildx/{genome}.log", genome="{genomepath}".split("/")[-1])
     shell:
         "samtools faidx {input} 2> {log}"
 
@@ -106,7 +106,7 @@ rule map_reads_bwa_mem:
         mem="results/logs/bwa_mem/{sample}-{unit}.log",
         sort="results/logs/samtools_sort/{sample}-{unit}.log",
     params:
-        index=config["genome"],
+        index=get_ref,
         extra=get_read_group
     threads: config["params"]["threads"]
     conda:
@@ -147,8 +147,8 @@ rule samptools_filter:
         bam="results/5_filtered/{sample}-{unit}.bam",
         metrics="results/5_filtered/{sample}-{unit}.filter.txt"
     params:
-        minq=config["params"]["filter"]["min_mapq"],
-        minl=config["params"]["filter"]["min_len"]
+        minq=get_min_q,
+        minl=get_min_len
     conda:
         "../env.yaml"
     shell:
@@ -175,7 +175,7 @@ rule samtools_merge:
 rule regions:
     input:
         "results/6_merged/{sample}.bam",
-        genome_fai=config["genome"] + '.fai'
+        genome_fai=get_ref_fai
     output:
         pos="results/7_positions/{sample}.bed",
         reg="results/8_regions/{sample}.tsv"
