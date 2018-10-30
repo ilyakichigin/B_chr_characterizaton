@@ -180,12 +180,12 @@ def regions_stats(regions, chrom_lens):
     # general stats
     total_pos = regions['reg_pos'].sum()
     genome_len = sum([c[1] for c in chrom_lens.values()])
-    regions['reg_size'] = regions['reg_end'] - regions['reg_start']
+    regions['reg_len'] = regions['reg_end'] - regions['reg_start']
     regions['chrom_len'] = pd.DataFrame(regions['chrom'].map(chrom_lens).values.tolist())[1]
-    regions['log_ratio'] = np.log10( (regions['reg_pos'] / total_pos) / (regions['reg_size'] / genome_len) )
+    regions['log_ratio'] = np.log10( (regions['reg_pos'] / total_pos) / (regions['reg_len'] / genome_len) )
     # enrichment p-value
     regions['p_value'] = regions.apply(lambda row: binom_test(row['reg_pos'],  total_pos,
-                                               row['reg_size'] / genome_len, 
+                                               row['reg_len'] / genome_len, 
                                                alternative='greater'), axis=1)
     return regions
 
