@@ -15,7 +15,6 @@ units = pd.read_table(config["samples"], dtype=str).set_index(["sample", "unit"]
 units.index = units.index.set_levels([i.astype(str) for i in units.index.levels])  # enforce str in index
 units['prefix'] = units['sample'] + '-' + units['unit']
 validate(units, schema="../schemas/samples.schema.yaml")
-print(units.loc["B", ["reference"]].iloc[0])
 
 # contigs in reference genome
 # contigs = pd.read_table(config["genome"] + ".fai",
