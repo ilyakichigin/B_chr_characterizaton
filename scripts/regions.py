@@ -93,16 +93,8 @@ def shift_regions(regions, pos, chrom_lens):
         on distance complements (+1 position per chromosome).
         Get coverage and position size statistics for positions within a region.
         """
-        reg_pos = pos[(pos['chrom'] == reg['chrom']) & 
-                        (pos['start'] >= reg['reg_start']) & 
-                        (pos['start'] <= reg['reg_end'])]
-        try:
-            reg['reg_pos'] = reg_pos.shape[0] # nrows
-            reg['reg_reads'] = reg_pos['name'].sum()
-            reg['pos_cov_mean'] = reg_pos['name'].mean() # coverage as 'name' column in pos df
-            reg['pos_len_mean'] = (reg_pos['end']-reg_pos['start']).mean()
-            reg['pos_len_sum'] = (reg_pos['end']-reg_pos['start']).sum()
-        except: # no positions in chromosome 
+        def fill_empty(reg):
+            """Fill data for region without read positions"""
             reg['reg_pos'] = 0
             reg['reg_reads'] = 0
             reg['pos_cov_mean'] = 0
@@ -111,6 +103,24 @@ def shift_regions(regions, pos, chrom_lens):
             # replacing seg_mean and pd_mean, as values produced by DNAcopy are not meaningful
             reg['pd_mean'] = reg['reg_end']
             reg['lg_pd_mean'] = np.log10(reg['reg_end'])
+
+            return reg
+
+        if reg['reg_pos'] > 1:
+            reg_pos = pos[(pos['chrom'] == reg['chrom']) & 
+                            (pos['start'] >= reg['reg_start']) & 
+                            (pos['start'] <= reg['reg_end'])]
+            try:
+                reg['reg_pos'] = reg_pos.shape[0] # nrows
+                reg['reg_reads'] = reg_pos['name'].sum()
+                reg['pos_cov_mean'] = reg_pos['name'].mean() # coverage as 'name' column in pos df
+                reg['pos_len_mean'] = (reg_pos['end']-reg_pos['start']).mean()
+                reg['pos_len_sum'] = (reg_pos['end']-reg_pos['start']).sum()
+            except: # no positions in chromosome 
+                print('empty')
+                fill_empty(reg)
+        else:
+            fill_empty(reg)
         return reg
 
     regions = regions.sort_values(['chrom', 'reg_start'])
