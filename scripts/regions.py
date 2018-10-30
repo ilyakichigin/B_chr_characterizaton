@@ -1,6 +1,7 @@
 # supress warnings for rpy2-pandas interface deprecation
+# and 0-division during log calculation
 import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore')
 
 import pybedtools
 import pandas as pd
@@ -8,6 +9,7 @@ import numpy as np
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
+from scipy.stats import binom_test
 
 in_bam = snakemake.input[0]
 genome_fai = str(snakemake.input.genome_fai) # for some reason read as snakemake.io.Namedlist
@@ -15,108 +17,180 @@ out_pos = snakemake.output.pos
 out_reg = snakemake.output.reg
 sample = snakemake.params.sample
 
-# genome sizes
-genome = dict()
+# chromosome sizes from fasta index
+# chromosome : (0, chromosome_length)
+chrom_lens = dict()
 with open(genome_fai) as f:
     for l in f:
         ll = l.split('\t')
         try:
-            genome[ll[0]] = (0, int(ll[1]))
+            chrom_lens[ll[0]] = (0, int(ll[1]))
         except:
             pass
 
 # positions and distances between positions
 in_bam = pybedtools.BedTool(in_bam)
+# positions - merged overlapping reads
 pos_bed = in_bam.bam_to_bed().sort().merge(c=1, o='count').saveas(out_pos)
 pos = pos_bed.to_dataframe()
 pos['chrom'] = pos['chrom'].astype(str)
-dist = pos_bed.complement(g=genome).to_dataframe()
+# distance - complement of positions, i.e. end-to-start distances between positions
+dist = pos_bed.complement(g=chrom_lens).to_dataframe()
 dist['chrom'] = dist['chrom'].astype(str)
+# logscale end-to-start distances
 dist['log.dist'] = np.log10(dist['end'] - dist['start'])
 
-# distance-based segmentation of genome
-dnacopy = importr('DNAcopy')
-cna = robjects.r['CNA'](robjects.FloatVector(dist['log.dist']),
-                        robjects.StrVector(dist['chrom']), 
-                        robjects.IntVector(dist['end']), 
-                        data_type="logratio", sample=sample)
-cna = robjects.r['smooth.CNA'](cna)
-segm = robjects.r['segment'](cna, verbose=0)
+def segment_genome(dist, sample):
+    """
+    Segmentation of genome based on logscale distances between read positions
+    with DNAcopy circular binary segmentation algorithm.
+    Outputs predicted regions with different mean distances between positions (pd_mean)
+    """
+    # R code for segmentation
+    dnacopy = importr('DNAcopy')
+    cna = robjects.r['CNA'](robjects.FloatVector(dist['log.dist']),
+                            robjects.StrVector(dist['chrom']), 
+                            robjects.IntVector(dist['end']), # end of dist = start of pos
+                            data_type="logratio", sample=sample)
+    cna = robjects.r['smooth.CNA'](cna)
+    segm = robjects.r['segment'](cna, verbose=0)
 
-# data to python, start annotation
-pandas2ri.activate()
-regions = robjects.pandas2ri.ri2py(segm[1])
-regions['pd.mean'] = np.power(10, regions['seg.mean'])
-regions = regions.rename(columns={col: col.replace('.','_') for col in regions.columns})
-
-# expand high-density regions by 1 position at left margin
-# this step is needed as left-side distances are used in segmentation
-# note that we shift margins without recalculating distances
-shift_regs = []
-# slow iterrows
-for r in regions.iterrows():
-    cr = r[1]
-    # shift end back 1bp if current: high pd, next: low pd
-    try:
-        nr = regions.iloc[r[0] + 1]
-        if cr.chrom == nr.chrom and cr.seg_mean > nr.seg_mean:
-            cr['loc_end'] = cr.loc_end - 1
-    except:
-        pass
-    # shift start back 1pos if previous: high bp, current: low pd
-    try:    
-        pr = regions.iloc[r[0] - 1]
-        if pr.chrom == cr.chrom and pr.seg_mean > cr.seg_mean:
-            cr['loc_start'] = pr.loc_end
-    except:
-        pass
-    shift_regs.append(cr)
-shift_regs = pd.DataFrame(shift_regs)
-shift_regs = shift_regs.rename(columns={
+    # convert to pandas dataframe
+    pandas2ri.activate()
+    regions = robjects.pandas2ri.ri2py(segm[1])
+    
+    # normalize names
+    regions = regions.rename(columns={
         'ID':'sample',
-        'loc_start':'reg_start', 
-        'loc_end':'reg_end',
-        'num_mark':'reg_pos',
-        'seg_mean':'lg_pd_mean'})
+        'loc.start':'reg_start', 
+        'loc.end':'reg_end',
+        'num.mark':'reg_pos',
+        'seg.mean':'lg_pd_mean'})
+    # recover mean distances between positions
+    regions['pd_mean'] = np.power(10, regions['lg_pd_mean'])
+    
+    return regions
 
-# main annotation
-def segment_positions(segm):
+def shift_regions(regions, pos, chrom_lens):
     """
-    Using positions within a segment, correct start and end of segment to start
-    of first and end of last position in segment,
-    recalculate number of positions (initial clustering was done on complements 
-    - one more position),
-    get mean coverage and position size for positions within a segment
+    Segmentation results correction and annotation
+    
+    Priority:
+    - Start of first region in chromosome - 0
+    - End of last region in chromosome - chromosome length
+    - Highest pd regions start and end at positions
+    - Lower pd regions include distance to higher pd region position.
+    
+    Implemented as iterrows, speedup possible
     """
-    segm_pos = pos[(pos['chrom'] == segm['chrom']) & 
-                    (pos['start'] >= segm['reg_start']) & 
-                    (pos['start'] <= segm['reg_end'])]
-    try:
-        segm['reg_start'] = segm_pos.iloc[0]['start'] # start of first pos in segment
-        segm['reg_end'] = segm_pos.iloc[-1]['end'] # end of last pos in segment
-        segm['reg_pos'] = segm_pos.shape[0] # nrows
-        segm['pos_cov_mean'] = segm_pos['name'].mean() # coverage as 'name' column in pos df
-        segm['reg_reads'] = segm_pos['name'].sum()
-        segm['pos_len_mean'] = (segm_pos['end']-segm_pos['start']).mean()
-        segm['pos_len_sum'] = (segm_pos['end']-segm_pos['start']).sum()
-    except: # no positions in chromosome 
-        segm['reg_start'] = 0
-        segm['reg_end'] = segm['reg_end'] 
-        segm['reg_pos'] = 0
-        segm['pos_cov_mean'] = 0
-        segm['reg_reads'] = 0
-        segm['pos_len_mean'] = 0
-        segm['pos_len_sum'] = 0
-        # replacing seg_mean and pd_mean, as values produced by DNAcopy are not meaningful
-        segm['pd_mean'] = segm['reg_end']
-        segm['lg_pd_mean'] = np.log10(segm['reg_end'])
-    segm['reg_len'] = segm['reg_end'] - segm['reg_start']
-    segm['chrom_len'] = genome[segm['chrom']][1]
-    segm['prop_reg_covered'] = segm['pos_len_sum'] / segm['reg_len']
-    segm['prop_chrom_len'] = segm['reg_len'] / segm['chrom_len']
-    return segm
-# slowest part of script - apply with entire positions df filtering at each segment
-corr_regs = shift_regs.apply(segment_positions, axis=1)
+
+    def annotate_region(reg, pos):
+        """
+        For a single region,
+        recalculate number of positions as initial clustering was done 
+        on distance complements (+1 position per chromosome).
+        Get coverage and position size statistics for positions within a region.
+        """
+        reg_pos = pos[(pos['chrom'] == reg['chrom']) & 
+                        (pos['start'] >= reg['reg_start']) & 
+                        (pos['start'] <= reg['reg_end'])]
+        try:
+            reg['reg_pos'] = reg_pos.shape[0] # nrows
+            reg['pos_cov_mean'] = reg_pos['name'].mean() # coverage as 'name' column in pos df
+            reg['pos_len_mean'] = (reg_pos['end']-reg_pos['start']).mean()
+            reg['pos_len_sum'] = (reg_pos['end']-reg_pos['start']).sum()
+        except: # no positions in chromosome 
+            reg['reg_pos'] = 0
+            reg['pos_cov_mean'] = 0
+            reg['pos_len_mean'] = 0
+            reg['pos_len_sum'] = 0
+            # replacing seg_mean and pd_mean, as values produced by DNAcopy are not meaningful
+            reg['pd_mean'] = reg['reg_end']
+            reg['lg_pd_mean'] = np.log10(reg['reg_end'])
+        return reg
+
+    regions = regions.sort_values(['chrom', 'reg_start'])
+    shift_regs = []
+    # slow iterrows
+    for (i, r) in regions.iterrows():
+        
+        cr = r
+        # compare to previous region
+        try: 
+            pr = regions.iloc[i - 1]
+            # first region in chromosome
+            if cr.chrom != pr.chrom:  
+                cr['reg_start'] = 0
+            elif pr.chrom == cr.chrom:
+                # low-pd to high-pd
+                # shift to start of previous position
+                # coincides with previous region end
+                if pr.pd_mean > cr.pd_mean:
+                    cr['reg_start'] = pr.reg_end
+                # high-pd to low-pd
+                # shift to end of previous position + 1
+                elif pr.pd_mean < cr.pd_mean:
+                    prev_pos = pos[(pos['chrom'] == pr.chrom) & (pos['start'] == pr.reg_end)]
+                    cr['reg_start'] = prev_pos['end'].iloc[0] + 1
+                else:
+                    raise ValueError('Consequent regions have same pd_mean:'
+                                     '\n{}\n{}'.format(pr, cr))
+        # first region in dataset
+        except:
+            cr['reg_start'] = 0
+        # compare to next region
+        try:
+            nr = regions.iloc[i + 1]
+            # last region in chromosome
+            if cr.chrom != nr.chrom:
+                cr['reg_end'] = chrom_lens[cr.chrom][1]
+            elif cr.chrom == nr.chrom: 
+                # low-pd to high pd
+                # shift 1 bp left (position is correct)
+                if cr.pd_mean > nr.pd_mean:
+                    cr['reg_end'] = cr.reg_end - 1
+                # high-pd to low-pd
+                # shift to end of current position (position is correct)
+                elif cr.pd_mean < nr.pd_mean: 
+                    curr_pos = pos[(pos['chrom'] == cr.chrom) & (pos['start'] == cr.reg_end)]
+                    cr['reg_end'] = curr_pos['end'].iloc[0]
+                else:
+                    raise ValueError('Consequent regions have same pd_mean:'
+                                     '\n{}\n{}'.format(cr, nr))
+            else:
+                pass
+        # last region in dataset
+        except:
+            cr['reg_end'] = chrom_lens[cr.chrom][1]
+            
+        cr = annotate_region(cr, pos)
+        
+        shift_regs.append(cr)
+
+    return pd.DataFrame(shift_regs)
+
+def regions_stats(regions, chrom_lens):
+    """
+    Calculate per-region statistics, 
+    log-ratio of enrichment with positions (>0 - enrichment, <0 - depletion),
+    p-value for enrichment with positions
+    """
+    # general stats
+    total_pos = regions['reg_pos'].sum()
+    genome_len = sum([c[1] for c in chrom_lens.values()])
+    regions['reg_size'] = regions['reg_end'] - regions['reg_start']
+    regions['chrom_len'] = pd.DataFrame(regions['chrom'].map(chrom_lens).values.tolist())[1]
+    regions['log_ratio'] = np.log10( (regions['reg_pos'] / total_pos) / (regions['reg_size'] / genome_len) )
+    # enrichment p-value
+    regions['p_value'] = regions.apply(lambda row: binom_test(row['reg_pos'],  total_pos,
+                                               row['reg_size'] / genome_len, 
+                                               alternative='greater'), axis=1)
+    return regions
+
+regions = segment_genome(dist, sample)
+regions = shift_regions(regions, pos, chrom_lens)
+regions = regions_stats(regions, chrom_lens)
+regions.sort_values('p_value')
 
 #output
-corr_regs.to_csv(out_reg, sep="\t", index=False)
+regions.to_csv(out_reg, sep="\t", index=False)
