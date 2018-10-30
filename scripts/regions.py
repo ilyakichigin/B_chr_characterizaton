@@ -98,11 +98,13 @@ def shift_regions(regions, pos, chrom_lens):
                         (pos['start'] <= reg['reg_end'])]
         try:
             reg['reg_pos'] = reg_pos.shape[0] # nrows
+            reg['reg_reads'] = reg_pos['name'].sum()
             reg['pos_cov_mean'] = reg_pos['name'].mean() # coverage as 'name' column in pos df
             reg['pos_len_mean'] = (reg_pos['end']-reg_pos['start']).mean()
             reg['pos_len_sum'] = (reg_pos['end']-reg_pos['start']).sum()
         except: # no positions in chromosome 
             reg['reg_pos'] = 0
+            reg['reg_reads'] = 0
             reg['pos_cov_mean'] = 0
             reg['pos_len_mean'] = 0
             reg['pos_len_sum'] = 0
