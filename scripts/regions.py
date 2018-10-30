@@ -11,34 +11,36 @@ from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
 from scipy.stats import binom_test
 
-in_bam = snakemake.input[0]
-genome_fai = str(snakemake.input.genome_fai) # for some reason read as snakemake.io.Namedlist
-out_pos = snakemake.output.pos
-out_reg = snakemake.output.reg
-sample = snakemake.params.sample
 
-# chromosome sizes from fasta index
-# chromosome : (0, chromosome_length)
-chrom_lens = dict()
-with open(genome_fai) as f:
-    for l in f:
-        ll = l.split('\t')
-        try:
-            chrom_lens[ll[0]] = (0, int(ll[1]))
-        except:
-            pass
+def read_fai(gneome_fai): 
+    """
+    chromosome sizes from fasta index
+    chromosome : (0, chromosome_length)
+    """
+    chrom_lens = dict()
+    with open(genome_fai) as f:
+        for l in f:
+            ll = l.split('\t')
+            try:
+                chrom_lens[ll[0]] = (0, int(ll[1]))
+            except:
+                pass
+    return chrom_lens
 
-# positions and distances between positions
-in_bam = pybedtools.BedTool(in_bam)
-# positions - merged overlapping reads
-pos_bed = in_bam.bam_to_bed().sort().merge(c=1, o='count').saveas(out_pos)
-pos = pos_bed.to_dataframe()
-pos['chrom'] = pos['chrom'].astype(str)
-# distance - complement of positions, i.e. end-to-start distances between positions
-dist = pos_bed.complement(g=chrom_lens).to_dataframe()
-dist['chrom'] = dist['chrom'].astype(str)
-# logscale end-to-start distances
-dist['log.dist'] = np.log10(dist['end'] - dist['start'])
+def bam_to_pos_and_dist(in_bam, out_pos):
+    # positions and distances between positions
+    in_bam = pybedtools.BedTool(in_bam)
+    # positions - merged overlapping reads
+    pos_bed = in_bam.bam_to_bed().sort().merge(c=1, o='count').saveas(out_pos)
+    pos = pos_bed.to_dataframe()
+    pos['chrom'] = pos['chrom'].astype(str)
+    # distance - complement of positions, i.e. end-to-start distances between positions
+    dist = pos_bed.complement(g=chrom_lens).to_dataframe()
+    dist['chrom'] = dist['chrom'].astype(str)
+    # logscale end-to-start distances
+    dist['log.dist'] = np.log10(dist['end'] - dist['start'])
+
+    return (pos, dist)
 
 def segment_genome(dist, sample):
     """
@@ -187,10 +189,15 @@ def regions_stats(regions, chrom_lens):
                                                alternative='greater'), axis=1)
     return regions
 
-regions = segment_genome(dist, sample)
-regions = shift_regions(regions, pos, chrom_lens)
-regions = regions_stats(regions, chrom_lens)
-regions.sort_values('p_value')
-
-#output
-regions.to_csv(out_reg, sep="\t", index=False)
+if __name__ == "__main__":
+    in_bam = snakemake.input[0]
+    genome_fai = str(snakemake.input.genome_fai) # for some reason read as snakemake.io.Namedlist
+    out_pos = snakemake.output.pos
+    out_reg = snakemake.output.reg
+    sample = snakemake.params.sample
+    chrom_lens = read_fai(genome_fai)
+    (pos, dist) = bam_to_pos_and_dist(in_bam, out_pos)
+    regions = segment_genome(dist, sample)
+    regions = shift_regions(regions, pos, chrom_lens)
+    regions = regions_stats(regions, chrom_lens)
+    regions.to_csv(out_reg, sep="\t", index=False)
