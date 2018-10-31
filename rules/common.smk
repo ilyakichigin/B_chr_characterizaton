@@ -8,26 +8,17 @@ configfile: "config.yaml"
 # reactivate later with meaningful parameters
 # validate(config, schema="../schemas/config.schema.yaml")
 
-# samples = pd.read_table(config["samples"]).set_index("sample", drop=False)
-# validate(samples, schema="../schemas/samples.schema.yaml")
-
 units = pd.read_table(config["samples"], dtype=str).set_index(["sample", "unit"], drop=False)
 units.index = units.index.set_levels([i.astype(str) for i in units.index.levels])  # enforce str in index
 units['prefix'] = units['sample'] + '-' + units['unit']
 validate(units, schema="../schemas/samples.schema.yaml")
 
-# contigs in reference genome
-# contigs = pd.read_table(config["genome"] + ".fai",
-#                         header=None, usecols=[0], squeeze=True, dtype=str)
-
 
 ##### Wildcard constraints #####
 wildcard_constraints:
-    # vartype="snvs|indels",
-    sample="|".join(units["sample"].unique()),
-    unit="|".join(units["unit"]),
-    genomepath="|".join(units["reference"].unique())
-    # contig="|".join(contigs)
+    sample=units["sample"].drop_duplicates().str.cat(sep='|'),
+    unit=units["unit"].str.cat(sep='|'),
+    genomepath=units["reference"].drop_duplicates().str.cat(sep='|')
 
 
 ##### Helper functions #####
@@ -94,20 +85,20 @@ def get_read_group(wildcards):
         platform=units.loc[(wildcards.sample, wildcards.unit), "platform"])
 
 def get_ref(wildcards):
-    """Get reference genome for given sample."""
-    return units.loc[wildcards.sample, ["reference"]].iloc[0]
+    """Get first reference genome for given sample."""
+    return units.loc[wildcards.sample, "reference"].iloc[0]
 
 def get_ref_fai(wildcards):
-    """Get reference genome for given sample."""
-    return units.loc[wildcards.sample, ["reference"]].iloc[0] + '.fai'
+    """Get first reference genome for given sample."""
+    return units.loc[wildcards.sample, "reference"].iloc[0] + '.fai'
 
 def get_min_len(wildcards):
     """Get filtering parameter of given sample-unit."""
-    return units.loc[(wildcards.sample, wildcards.unit), ["min_len"]]
+    return units.loc[(wildcards.sample, wildcards.unit), "min_len"]
 
 def get_min_q(wildcards):
     """Get filtering parameter of given sample-unit."""
-    return units.loc[(wildcards.sample, wildcards.unit), ["min_q"]]
+    return units.loc[(wildcards.sample, wildcards.unit), "min_q"]
 
 def get_filtered_bams(wildcards):
     """Get all per-unit alignments of given sample"""

@@ -75,15 +75,12 @@ rule bwa_index:
         "{genomepath}.bwt",
         "{genomepath}.pac",
         "{genomepath}.sa"
-    log:
-        expand("results/logs/bwa_index/{genome}.log", genome="{genomepath}".split("/")[-1])
     conda:
         "../env.yaml"
     shell:
         "bwa index"
         " -p {input}"
         " {input}"
-        " &> {log}"
 
 rule samtools_faidx:
     input:
@@ -92,10 +89,8 @@ rule samtools_faidx:
         "{genomepath}.fai"
     conda:
         "../env.yaml"
-    log:
-        expand("results/logs/samtools_faildx/{genome}.log", genome="{genomepath}".split("/")[-1])
     shell:
-        "samtools faidx {input} 2> {log}"
+        "samtools faidx {input}"
 
 rule map_reads_bwa_mem:
     input:
