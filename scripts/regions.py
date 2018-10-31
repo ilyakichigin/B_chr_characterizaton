@@ -95,14 +95,16 @@ def shift_regions(regions, pos, chrom_lens):
         """
         def fill_empty(reg):
             """Fill data for region without read positions"""
+            reg['first_pos_start'] = np.nan
+            reg['last_pos_end'] = np.nan
             reg['reg_pos'] = 0
             reg['reg_reads'] = 0
             reg['pos_cov_mean'] = 0
             reg['pos_len_mean'] = 0
             reg['pos_len_sum'] = 0
-            # replacing seg_mean and pd_mean, as values produced by DNAcopy are not meaningful
-            reg['pd_mean'] = reg['reg_end']
-            reg['lg_pd_mean'] = np.log10(reg['reg_end'])
+            # deleting seg_mean and pd_mean, as values produced by DNAcopy are not meaningful
+            reg['pd_mean'] = np.nan
+            reg['lg_pd_mean'] = np.nan
 
             return reg
 
@@ -111,6 +113,8 @@ def shift_regions(regions, pos, chrom_lens):
                             (pos['start'] >= reg['reg_start']) & 
                             (pos['start'] <= reg['reg_end'])]
             try:
+                reg['first_pos_start'] = reg_pos['start'].iloc[0]
+                reg['last_pos_end'] = reg_pos['end'].iloc[-1]
                 reg['reg_pos'] = reg_pos.shape[0] # nrows
                 reg['reg_reads'] = reg_pos['name'].sum()
                 reg['pos_cov_mean'] = reg_pos['name'].mean() # coverage as 'name' column in pos df
