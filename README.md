@@ -1,6 +1,6 @@
 # Introduction
 
-DOPseq_analyzer is a set of tools for processing high-throughput sequencing data generated from isolated (flow sorted or microdissected) chromosomes.
+DOPseq_analyzer is a set of tools for processing high-throughput sequencing data generated from isolated (flow sorted or microdissected) chromosomes. Active development is now moved to https://github.com/lca-imcb/dopseq - a re-implementation based on Conda and Snakemake.
 
 Currently, three pipelines are implemented: 
 
