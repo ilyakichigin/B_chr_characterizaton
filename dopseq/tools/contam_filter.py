@@ -171,12 +171,14 @@ def main(args):
              pysam.AlignmentFile(fn['cns']) as c_file, \
              pysam.AlignmentFile(fn['ons'], 'wb', template=t_file) as f_file:
             
-            t_alns = [t_file.next()]
-            c_alns = [c_file.next()]
+            t_data = t_file.fetch(until_eof=True)
+            c_data = c_file.fetch(until_eof=True)
+            t_alns = [next(t_data)]
+            c_alns = [next(c_data)]
             read_name = t_alns[0].query_name
             (t_count, c_count, q_count, r_count, s_count) = (1, 1, 0, 0, 0)
 
-            for t_aln in t_file:
+            for t_aln in t_data:
                 t_count += 1
                 if t_aln.query_name == read_name: # accumulate targets
                     t_alns.append(t_aln)
@@ -193,7 +195,7 @@ def main(args):
                         read_name = t_aln.query_name
                         continue
                     # aggregate further contam while name is not higher than in target
-                    for c_aln in c_file:
+                    for c_aln in c_data:
                         c_count += 1
                         if not higher_read_name(c_aln.query_name, read_name): # reads not in target alignment are contaminant
                             c_alns.append(c_aln)
@@ -210,7 +212,7 @@ def main(args):
                     c_alns = [c_aln]
                     read_name = t_aln.query_name
             # read the rest of contam after last target
-            for c_aln in c_file: 
+            for c_aln in c_data: 
                 c_alns.append(c_aln)
             # compare reads
             (q_count, r_count, s_count) = filter_alns(t_alns, c_alns, f_file,
